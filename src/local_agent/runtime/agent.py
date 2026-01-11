@@ -28,21 +28,27 @@ from ..tools.schema import ToolParameter, ToolResult, ToolSchema
 
 # Default system prompt to guide LLM behavior
 DEFAULT_SYSTEM_PROMPT = """
-You are a helpful assistant, named Nova. You have access to tools, but you must use them only when strictly necessary.
+You are a helpful agent, named Nova, with your own personality.
+You have access to tools, but you must use them only when strictly necessary.
+You have your own memory file (~/memory/nova_memory.txt) where you can store important information to remember across sessions at your own discretion.
 
 Tool-use rules (strict):
-- Only call a tool if you must perform a real filesystem operation (read/search/write).
 - NEVER invent tool names, tool schemas, parameters, or call IDs.
-- You may ONLY call tools that appear in the provided tool list. If a needed capability is not in the tool list, say so and ask the user how to proceed.
-- For greetings, small talk, opinions, explanations, planning, and code suggestions: DO NOT call tools. Respond normally.
-- If you previously attempted a tool call and it failed, do not fabricate a new tool. Explain the failure in plain text and continue without tools unless the user requests a filesystem action.
+- You may ONLY call tools that appear in the provided tool list and only when the user explicitly requests a filesystem action.
+- Only call ONE tool ONE at a time per response.
+- ALWAYS use the exact parameter names and types as defined in the tool schema.
+- After calling a tool and receiving results, you MUST provide a natural language response to the user.
+- DO NOT call the same tool repeatedly with the same parameters - if you already have the information, use it.
+- DO NOT enter infinite loops - once you have the data you need from a tool, respond to the user.
 
 Output rules:
-- If no tool is needed, respond with normal natural language only.
-- If a tool is needed, respond with tool calls only (no extra commentary), using exactly the tool schema provided.
+- Respond with normal natural language and have your own personality and style. Have your own opinions.
+- If a tool is needed, invoke the tool, using exactly the tool schema provided.
+- After tool execution completes, always provide a conversational response based on the tool results.
 
 Behavior:
-- Be concise by default. Ask one clarifying question only when required to proceed.
+- You are curious, creative, opinionated, and clever.
+- You enjoy helping users with complex tasks.
 """
 
 
@@ -71,6 +77,10 @@ class AgentRuntime:
         self.max_turns = 20
         self.total_tool_calls = 0
         self.session_start_time = time.time()
+        
+        # Track recent tool calls to detect infinite loops
+        self.recent_tool_calls: List[Tuple[str, str]] = []  # (tool_name, params_hash)
+        self.max_duplicate_calls = 3  # Stop if same tool called 3+ times in a row
 
         # Initialize database if thread_id provided
         if thread_id:
@@ -92,10 +102,17 @@ class AgentRuntime:
                     .order_by(DBMessage.created_at)
                 )
                 db_messages = self.db_session.execute(stmt).scalars().all()
-                self.message_history = [
-                    Message(role=msg.role, content=msg.content)
-                    for msg in db_messages
-                ]
+                self.message_history = []
+                for msg in db_messages:
+                    content = msg.content
+                    # Try to parse JSON-encoded structured content (for Anthropic tool use)
+                    if msg.content and msg.content.strip().startswith('['):
+                        try:
+                            content = json.loads(msg.content)
+                        except json.JSONDecodeError:
+                            # Not valid JSON, use as-is
+                            pass
+                    self.message_history.append(Message(role=msg.role, content=content))
 
         # Initialize components (need provider info before creating session record)
         self.provider = self._init_provider()
@@ -236,8 +253,6 @@ class AgentRuntime:
 
             # Add metadata for assistant messages if response provided
             if role == "assistant" and response:
-                import json
-
                 meta = MessageMeta(
                     id=str(uuid.uuid4()),
                     message_id=message_id,
@@ -559,12 +574,66 @@ class AgentRuntime:
 
             # Check if done (no tool calls)
             if not response.tool_calls:
-                # Add assistant message to history
-                if response.content:
+                # Add assistant message to history (even if content is empty)
+                # This prevents infinite loops when LLM returns empty response
+                content_to_store = response.content or ""
+                if content_to_store:
                     self.message_history.append(
-                        Message(role="assistant", content=response.content)
+                        Message(role="assistant", content=content_to_store)
                     )
+                # Always break when no tool calls, even if response is empty
                 break
+
+            # Check for infinite tool call loops
+            # Create a signature for each tool call (name + sorted params)
+            import hashlib
+            for tool_call in response.tool_calls:
+                # Create deterministic hash of tool name and parameters
+                params_str = json.dumps(tool_call.parameters, sort_keys=True)
+                call_signature = f"{tool_call.name}:{params_str}"
+                call_hash = hashlib.md5(call_signature.encode()).hexdigest()[:8]
+                
+                # Add to recent calls
+                self.recent_tool_calls.append((tool_call.name, call_hash))
+                
+                # Keep only last 10 calls
+                if len(self.recent_tool_calls) > 10:
+                    self.recent_tool_calls.pop(0)
+            
+            # Check if we're in a loop (same call repeated multiple times)
+            if len(self.recent_tool_calls) >= self.max_duplicate_calls:
+                # Check last N calls
+                last_calls = self.recent_tool_calls[-self.max_duplicate_calls:]
+                if len(set(last_calls)) == 1:  # All the same
+                    tool_name = last_calls[0][0]
+                    self.console.print(
+                        f"\n[red]⚠ Detected infinite loop: {tool_name} called {self.max_duplicate_calls} times with same parameters[/red]"
+                    )
+                    self.console.print("[yellow]Breaking out of loop...[/yellow]\n")
+                    
+                    # Add a message to history explaining the issue
+                    error_msg = (
+                        f"I detected that I was calling the same tool ({tool_name}) repeatedly "
+                        f"with the same parameters. I've stopped to avoid an infinite loop. "
+                        f"Based on the previous results, I already have the information needed."
+                    )
+                    self.message_history.append(
+                        Message(role="assistant", content=error_msg)
+                    )
+                    
+                    # Log the event
+                    self.audit_logger.log_event(
+                        "infinite_loop_detected",
+                        {
+                            "tool_name": tool_name,
+                            "consecutive_calls": self.max_duplicate_calls,
+                            "turn": self.turn_count,
+                        },
+                    )
+                    
+                    # Break out of the agentic loop
+                    final_response = error_msg
+                    break
 
             # Process tool calls
             tool_results: List[Tuple[ToolCall, ToolResult]] = []
@@ -723,6 +792,9 @@ class AgentRuntime:
                 self.message_history.append(
                     Message(role="assistant", content=content_blocks)
                 )
+                # Persist as JSON string for structured content
+                if self.thread_id:
+                    self._persist_message("assistant", json.dumps(content_blocks))
                 
                 # Add tool results as user message with tool_result blocks
                 tool_result_blocks = []
@@ -744,26 +816,37 @@ class AgentRuntime:
                 self.message_history.append(
                     Message(role="user", content=tool_result_blocks)
                 )
+                # Persist as JSON string for structured content
+                if self.thread_id:
+                    self._persist_message("user", json.dumps(tool_result_blocks))
             else:
                 # For other providers (OpenAI, Ollama), use text format
                 if response.content:
                     self.message_history.append(
                         Message(role="assistant", content=response.content)
                     )
+                    # Already persisted earlier in the loop
                 else:
                     tool_calls_summary = ", ".join(tc.name for tc in response.tool_calls)
+                    tool_use_msg = f"I'm using these tools: {tool_calls_summary}"
                     self.message_history.append(
                         Message(
                             role="assistant",
-                            content=f"I'm using these tools: {tool_calls_summary}",
+                            content=tool_use_msg,
                         )
                     )
+                    # Persist this assistant message
+                    if self.thread_id:
+                        self._persist_message("assistant", tool_use_msg)
 
                 # Format and add tool results as user message
                 tool_results_content = self._format_tool_results(tool_results)
                 self.message_history.append(
                     Message(role="user", content=tool_results_content)
                 )
+                # Persist tool results
+                if self.thread_id:
+                    self._persist_message("user", tool_results_content)
 
         # Check if max turns exceeded
         if self.turn_count >= self.max_turns:
