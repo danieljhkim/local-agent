@@ -12,7 +12,9 @@ from ..config.schema import AuditConfig
 class AuditLogger:
     """Logger for auditing tool calls and agent actions."""
 
-    def __init__(self, config: AuditConfig, session_id: str, thread_id: str | None = None):
+    def __init__(
+        self, config: AuditConfig, session_id: str, thread_id: str | None = None
+    ):
         """Initialize audit logger.
 
         Args:
@@ -50,7 +52,9 @@ class AuditLogger:
             # Apply redaction patterns
             redacted = data
             for pattern in self.config.redact_patterns:
-                redacted = re.sub(pattern, "***REDACTED***", redacted, flags=re.IGNORECASE)
+                redacted = re.sub(
+                    pattern, "***REDACTED***", redacted, flags=re.IGNORECASE
+                )
             return redacted
         else:
             return data

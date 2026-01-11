@@ -73,8 +73,7 @@ class ApprovalQueue:
         try:
             # Wait for user response via API endpoint
             await asyncio.wait_for(
-                approval.response_event.wait(),
-                timeout=self.timeout_seconds
+                approval.response_event.wait(), timeout=self.timeout_seconds
             )
         except asyncio.TimeoutError:
             # Clean up on timeout
@@ -112,9 +111,7 @@ class ApprovalQueue:
         """
         approval = self.pending.get(approval_id)
         if not approval:
-            raise ValueError(
-                f"Approval {approval_id} not found or already responded"
-            )
+            raise ValueError(f"Approval {approval_id} not found or already responded")
 
         # Set response
         approval.approved = approved

@@ -66,9 +66,7 @@ class FilesystemTools:
         except Exception as e:
             return ToolResult(success=False, error=str(e))
 
-    def fs_search(
-        self, root: str, pattern: str, max_results: int = 100
-    ) -> ToolResult:
+    def fs_search(self, root: str, pattern: str, max_results: int = 100) -> ToolResult:
         """Search for files matching a pattern.
 
         Args:
@@ -166,9 +164,7 @@ class FilesystemTools:
             return ToolResult(success=False, error=str(e))
 
 
-def register_filesystem_tools(
-    registry, connector: FilesystemConnector
-) -> None:
+def register_filesystem_tools(registry, connector: FilesystemConnector) -> None:
     """Register filesystem tools with the registry.
 
     Args:

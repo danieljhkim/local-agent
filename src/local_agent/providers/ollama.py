@@ -34,9 +34,7 @@ class OllamaProvider(LLMProvider):
         """
         super().__init__(api_key, model)
         self.base_url = (
-            base_url
-            or os.getenv("OLLAMA_BASE_URL")
-            or "http://localhost:11434"
+            base_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
         )
         self.model = model or os.getenv("OLLAMA_CHAT_MODEL", "llama3.1:8b")
         timeout_str = os.getenv("OLLAMA_TIMEOUT", "120")
@@ -80,7 +78,9 @@ class OllamaProvider(LLMProvider):
                                 text_parts.append(block.get("text", ""))
                             elif block.get("type") == "tool_result":
                                 # Format tool results as text
-                                text_parts.append(f"Tool result: {block.get('content', '')}")
+                                text_parts.append(
+                                    f"Tool result: {block.get('content', '')}"
+                                )
                     content = "\n".join(text_parts)
                 ollama_messages.append({"role": msg.role, "content": content})
 
@@ -133,9 +133,7 @@ class OllamaProvider(LLMProvider):
                 f"Ollama request timed out after {self.timeout}s"
             ) from e
         except Exception as e:
-            raise ProviderConnectionError(
-                f"Error calling Ollama: {str(e)}"
-            ) from e
+            raise ProviderConnectionError(f"Error calling Ollama: {str(e)}") from e
 
     async def stream_complete(
         self,
@@ -168,7 +166,9 @@ class OllamaProvider(LLMProvider):
                                 text_parts.append(block.get("text", ""))
                             elif block.get("type") == "tool_result":
                                 # Format tool results as text
-                                text_parts.append(f"Tool result: {block.get('content', '')}")
+                                text_parts.append(
+                                    f"Tool result: {block.get('content', '')}"
+                                )
                     content = "\n".join(text_parts)
                 ollama_messages.append({"role": msg.role, "content": content})
 
@@ -237,9 +237,7 @@ class OllamaProvider(LLMProvider):
                 f"Ollama request timed out after {self.timeout}s"
             ) from e
         except Exception as e:
-            raise ProviderConnectionError(
-                f"Error calling Ollama: {str(e)}"
-            ) from e
+            raise ProviderConnectionError(f"Error calling Ollama: {str(e)}") from e
 
     async def __aenter__(self):
         """Async context manager entry."""

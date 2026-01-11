@@ -20,12 +20,10 @@ class FilesystemConnector:
         """
         self.workspace_config = workspace_config
         self.allowed_roots = [
-            Path(root).expanduser().resolve()
-            for root in workspace_config.allowed_roots
+            Path(root).expanduser().resolve() for root in workspace_config.allowed_roots
         ]
         self.denied_paths = [
-            Path(path).expanduser().resolve()
-            for path in workspace_config.denied_paths
+            Path(path).expanduser().resolve() for path in workspace_config.denied_paths
         ]
 
     def _is_path_allowed(self, path: Path) -> bool:
@@ -78,7 +76,9 @@ class FilesystemConnector:
 
         return path
 
-    def read_file(self, path: str | Path, start_line: int = 0, end_line: int | None = None) -> str:
+    def read_file(
+        self, path: str | Path, start_line: int = 0, end_line: int | None = None
+    ) -> str:
         """Read a file with line range support.
 
         Args:
@@ -266,7 +266,7 @@ class FilesystemConnector:
         preview_lines = []
         for i, (orig, new) in enumerate(zip(original_lines, patched_lines)):
             if orig != new:
-                preview_lines.append(f"Line {i+1}:")
+                preview_lines.append(f"Line {i + 1}:")
                 preview_lines.append(f"  - {orig.rstrip()}")
                 preview_lines.append(f"  + {new.rstrip()}")
                 if len("\n".join(preview_lines)) > 500:
@@ -305,8 +305,7 @@ class FilesystemConnector:
 
         # Normalize original lines (ensure they all end with \n)
         normalized_lines = [
-            line if line.endswith("\n") else line + "\n"
-            for line in original_lines
+            line if line.endswith("\n") else line + "\n" for line in original_lines
         ]
 
         # Apply hunks
@@ -328,7 +327,9 @@ class FilesystemConnector:
                 if op_type == " ":
                     # Context line - verify and copy
                     if current_pos >= len(normalized_lines):
-                        raise ValueError(f"Context mismatch at line {current_pos + 1}: unexpected end of file")
+                        raise ValueError(
+                            f"Context mismatch at line {current_pos + 1}: unexpected end of file"
+                        )
 
                     expected = line_content.rstrip()
                     actual = normalized_lines[current_pos].rstrip()
@@ -343,7 +344,9 @@ class FilesystemConnector:
                 elif op_type == "-":
                     # Line to remove - verify it matches and skip it
                     if current_pos >= len(normalized_lines):
-                        raise ValueError(f"Cannot remove line {current_pos + 1}: unexpected end of file")
+                        raise ValueError(
+                            f"Cannot remove line {current_pos + 1}: unexpected end of file"
+                        )
 
                     expected = line_content.rstrip()
                     actual = normalized_lines[current_pos].rstrip()
@@ -400,13 +403,20 @@ class FilesystemConnector:
             line = lines[i]
 
             # Skip header lines (---, +++, diff, index, etc.)
-            if line.startswith("---") or line.startswith("+++") or line.startswith("diff") or line.startswith("index"):
+            if (
+                line.startswith("---")
+                or line.startswith("+++")
+                or line.startswith("diff")
+                or line.startswith("index")
+            ):
                 i += 1
                 continue
 
             # Hunk header: @@ -start,count +start,count @@
             if line.startswith("@@"):
-                match = re.match(r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@", line)
+                match = re.match(
+                    r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@", line
+                )
                 if match:
                     if current_hunk:
                         hunks.append(current_hunk)

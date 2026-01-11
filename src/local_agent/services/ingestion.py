@@ -87,9 +87,7 @@ class IngestionPipeline:
         # Check if already ingested
         if self.db_session:
             existing = (
-                self.db_session.query(Document)
-                .filter_by(source_path=str(path))
-                .first()
+                self.db_session.query(Document).filter_by(source_path=str(path)).first()
             )
 
             if existing and existing.file_hash == file_hash:
@@ -188,6 +186,7 @@ class IngestionPipeline:
             except Exception as e:
                 # Log error but continue with other files
                 import traceback
+
                 error_details = f"{type(e).__name__}: {str(e)}"
                 traceback_str = traceback.format_exc()
                 results.append(

@@ -78,9 +78,7 @@ class AnthropicProvider(LLMProvider):
                 content = block.text
             elif block.type == "tool_use":
                 tool_calls.append(
-                    ToolCall(
-                        id=block.id, name=block.name, parameters=block.input
-                    )
+                    ToolCall(id=block.id, name=block.name, parameters=block.input)
                 )
 
         return CompletionResponse(

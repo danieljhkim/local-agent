@@ -2,7 +2,14 @@
 
 from typing import Any, Dict, List
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import (
+    Distance,
+    VectorParams,
+    PointStruct,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
 
 from ..config.schema import QdrantConfig
 
@@ -95,7 +102,9 @@ class QdrantConnector:
         filter_conditions = None
         if source_filter:
             filter_conditions = Filter(
-                must=[FieldCondition(key="source", match=MatchValue(value=source_filter))]
+                must=[
+                    FieldCondition(key="source", match=MatchValue(value=source_filter))
+                ]
             )
 
         results = self.client.search(

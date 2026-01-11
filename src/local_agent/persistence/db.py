@@ -9,7 +9,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 def get_database_path() -> Path:
     """Get database path from environment or default.
-    
+
     Priority:
     1. AGENT_DATABASE_PATH env var (explicit path)
     2. AGENT_STATE_DIR env var + local_agent.db
@@ -18,11 +18,10 @@ def get_database_path() -> Path:
     # Check for explicit database path
     if db_path := os.environ.get("AGENT_DATABASE_PATH"):
         return Path(db_path).expanduser()
-    
+
     # Check for state directory
     state_dir = os.environ.get(
-        "AGENT_STATE_DIR",
-        str(Path.home() / ".local" / "agent" / "state")
+        "AGENT_STATE_DIR", str(Path.home() / ".local" / "agent" / "state")
     )
     return Path(state_dir) / "local_agent.db"
 

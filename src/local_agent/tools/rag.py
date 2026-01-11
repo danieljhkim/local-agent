@@ -91,13 +91,13 @@ class RAGTools:
             if not results:
                 return ToolResult(success=True, result=[], metadata=metadata)
 
-            return ToolResult(
-                success=True, result=formatted_results, metadata=metadata
-            )
+            return ToolResult(success=True, result=formatted_results, metadata=metadata)
 
         except Exception as e:
             return ToolResult(
-                success=False, error=f"RAG search failed: {str(e)}", metadata={"query": query}
+                success=False,
+                error=f"RAG search failed: {str(e)}",
+                metadata={"query": query},
             )
 
 

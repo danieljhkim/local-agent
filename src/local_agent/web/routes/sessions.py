@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 @router.post("", response_model=CreateSessionResponse)
 async def create_session(
     request: Optional[CreateSessionRequest] = None,
-    session_manager: SessionManager = Depends(get_session_manager)
+    session_manager: SessionManager = Depends(get_session_manager),
 ):
     """Create a new agent session.
 
@@ -29,6 +29,7 @@ async def create_session(
     if request:
         if request.identity:
             from ...identities import get_identity_manager
+
             manager = get_identity_manager()
             try:
                 system_prompt = manager.get_content(request.identity)
@@ -44,8 +45,7 @@ async def create_session(
 
 @router.delete("/{session_id}")
 async def delete_session(
-    session_id: str,
-    session_manager: SessionManager = Depends(get_session_manager)
+    session_id: str, session_manager: SessionManager = Depends(get_session_manager)
 ):
     """Delete a session and clean up resources.
 

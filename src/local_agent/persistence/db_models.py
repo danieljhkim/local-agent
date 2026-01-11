@@ -22,7 +22,9 @@ class Thread(Base):
     created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(DateTime, nullable=False, default=utcnow)
 
-    messages = relationship("Message", back_populates="thread", cascade="all, delete-orphan")
+    messages = relationship(
+        "Message", back_populates="thread", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):

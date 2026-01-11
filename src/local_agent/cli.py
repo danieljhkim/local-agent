@@ -16,17 +16,17 @@ from .config.schema import AgentConfig
 
 def _run_interactive_repl(runtime, console: Console) -> None:
     """Run an interactive REPL loop with the agent.
-    
+
     Handles user input, exit commands, and keyboard interrupts.
     Uses a persistent event loop for the session.
-    
+
     Args:
         runtime: AgentRuntime instance to execute commands
         console: Rich console for output
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     try:
         while True:
             try:
@@ -92,6 +92,7 @@ def chat(
     system_prompt = None
     if identity:
         from .identities import get_identity_manager
+
         manager = get_identity_manager()
         try:
             system_prompt = manager.get_content(identity)
@@ -118,7 +119,9 @@ def chat(
             thread = Thread(id=resolved_thread_id, title="Chat session")
             db.add(thread)
             db.commit()
-            console.print(f"[green]✓[/green] Created new thread: {resolved_thread_id[:8]}...")
+            console.print(
+                f"[green]✓[/green] Created new thread: {resolved_thread_id[:8]}..."
+            )
         except Exception as e:
             console.print(f"[red]Error creating thread:[/red] {e}")
             raise typer.Exit(1)
@@ -139,7 +142,9 @@ def chat(
 
     # Initialize runtime
     try:
-        runtime = AgentRuntime(config, thread_id=resolved_thread_id, system_prompt=system_prompt)
+        runtime = AgentRuntime(
+            config, thread_id=resolved_thread_id, system_prompt=system_prompt
+        )
         console.print(f"[green]✓[/green] Agent initialized")
         if not resolved_thread_id:
             console.print(f"[dim]Note: Running in ephemeral mode (not saved)[/dim]")
@@ -176,6 +181,7 @@ def run(
     system_prompt = None
     if identity:
         from .identities import get_identity_manager
+
         manager = get_identity_manager()
         try:
             system_prompt = manager.get_content(identity)
@@ -266,7 +272,7 @@ def config(
         default_config = AgentConfig()
 
         if config_file is None:
-            config_file = Path.home() / ".config" / "agent" / "config.yaml"
+            config_file = Path.home() / ".config" / "local-agent" / "config.yaml"
 
         if config_file.exists():
             overwrite = typer.confirm(
@@ -293,7 +299,9 @@ def config(
             console.print(f"\n[cyan]Workspace Roots:[/cyan]")
             for root in cfg.workspace.allowed_roots:
                 console.print(f"  - {root}")
-            console.print(f"\n[cyan]Approval Policies:[/cyan] {len(cfg.approval_policies)}")
+            console.print(
+                f"\n[cyan]Approval Policies:[/cyan] {len(cfg.approval_policies)}"
+            )
             console.print(f"[cyan]Audit Enabled:[/cyan] {cfg.audit.enabled}")
             console.print(f"[cyan]State Dir:[/cyan] {cfg.state_dir}")
         except Exception as e:
@@ -317,20 +325,16 @@ def version() -> None:
 def ingest(
     path: str = typer.Argument(..., help="File or directory path to ingest"),
     recursive: bool = typer.Option(
-        True, "--recursive/--no-recursive", "-r",
-        help="Recursively ingest directories"
+        True, "--recursive/--no-recursive", "-r", help="Recursively ingest directories"
     ),
     glob_pattern: str = typer.Option(
-        "**/*", "--pattern", "-p",
-        help="Glob pattern for files (e.g., '**/*.py')"
+        "**/*", "--pattern", "-p", help="Glob pattern for files (e.g., '**/*.py')"
     ),
     force: bool = typer.Option(
-        False, "--force", "-f",
-        help="Re-ingest even if already processed"
+        False, "--force", "-f", help="Re-ingest even if already processed"
     ),
     config_file: Optional[Path] = typer.Option(
-        None, "--config", "-c",
-        help="Path to config file"
+        None, "--config", "-c", help="Path to config file"
     ),
 ) -> None:
     """Ingest documents into the RAG knowledge store.
@@ -356,6 +360,7 @@ def ingest(
 
         # Ensure database is initialized
         from .persistence.database_init import check_database_exists, init_database
+
         if not check_database_exists():
             console.print("[yellow]Database not found. Initializing...[/yellow]")
             init_database()
@@ -371,7 +376,7 @@ def ingest(
             embedding_service=embedding_service,
             qdrant_connector=qdrant_connector,
             rag_config=config.rag,
-            db_session=db_session
+            db_session=db_session,
         )
 
         # Run ingestion
@@ -383,9 +388,7 @@ def ingest(
                 result["elapsed_seconds"] = time.time() - start_time
             else:
                 result = await pipeline.ingest_directory(
-                    path,
-                    glob_pattern=glob_pattern,
-                    recursive=recursive
+                    path, glob_pattern=glob_pattern, recursive=recursive
                 )
                 result["elapsed_seconds"] = time.time() - start_time
 
@@ -408,24 +411,31 @@ def ingest(
             console.print(f"  Time elapsed:    {result.get('elapsed_seconds', 0):.2f}s")
 
             # Show warnings if files were skipped or errored
-            if result.get('files_skipped', 0) > 0:
-                console.print(f"\n[yellow]Note:[/yellow] {result.get('files_skipped')} file(s) were skipped (empty or already ingested)")
+            if result.get("files_skipped", 0) > 0:
+                console.print(
+                    f"\n[yellow]Note:[/yellow] {result.get('files_skipped')} file(s) were skipped (empty or already ingested)"
+                )
 
-            if result.get('files_errored', 0) > 0:
-                console.print(f"\n[red]Warning:[/red] {result.get('files_errored')} file(s) failed to ingest")
+            if result.get("files_errored", 0) > 0:
+                console.print(
+                    f"\n[red]Warning:[/red] {result.get('files_errored')} file(s) failed to ingest"
+                )
 
                 # Show first error for debugging
-                if 'error_sample' in result:
+                if "error_sample" in result:
                     console.print(f"\n[yellow]Sample error:[/yellow]")
                     console.print(f"  File: {result['error_sample']['file']}")
                     console.print(f"  Error: {result['error_sample']['error']}")
-                    if 'traceback' in result['error_sample']:
+                    if "traceback" in result["error_sample"]:
                         console.print(f"\n[dim]Traceback:[/dim]")
-                        console.print(f"[dim]{result['error_sample']['traceback']}[/dim]")
+                        console.print(
+                            f"[dim]{result['error_sample']['traceback']}[/dim]"
+                        )
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         import traceback
+
         console.print(f"[dim]{traceback.format_exc()}[/dim]")
         raise typer.Exit(1)
     finally:
@@ -466,7 +476,9 @@ def threads_list(
             console.print("\n[dim]Create a new thread with 'agent threads new'[/dim]")
             return
 
-        console.print(f"[bold cyan]Recent Threads[/bold cyan] (showing {len(threads)} of {limit})\n")
+        console.print(
+            f"[bold cyan]Recent Threads[/bold cyan] (showing {len(threads)} of {limit})\n"
+        )
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("ID", style="cyan", width=10)
@@ -486,7 +498,9 @@ def threads_list(
             )
 
         console.print(table)
-        console.print(f"\n[dim]Use 'agent threads resume <id>' to continue a conversation[/dim]")
+        console.print(
+            f"\n[dim]Use 'agent threads resume <id>' to continue a conversation[/dim]"
+        )
     finally:
         db.close()
 
@@ -551,7 +565,9 @@ def threads_new(
 
 @threads_app.command("resume")
 def threads_resume(
-    thread_id: str = typer.Argument(..., help="Thread ID to resume (full ID or prefix)"),
+    thread_id: str = typer.Argument(
+        ..., help="Thread ID to resume (full ID or prefix)"
+    ),
     config_file: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to config file"
     ),
@@ -585,7 +601,9 @@ def threads_resume(
 
             if len(threads) == 0:
                 console.print(f"[red]Error:[/red] Thread not found: {thread_id}")
-                console.print("\n[dim]Use 'agent threads list' to see available threads[/dim]")
+                console.print(
+                    "\n[dim]Use 'agent threads list' to see available threads[/dim]"
+                )
                 raise typer.Exit(1)
             elif len(threads) > 1:
                 console.print(f"[red]Error:[/red] Ambiguous thread ID: {thread_id}")
@@ -641,7 +659,9 @@ def threads_resume(
 
 @threads_app.command("delete")
 def threads_delete(
-    thread_id: str = typer.Argument(..., help="Thread ID to delete (full ID or prefix)"),
+    thread_id: str = typer.Argument(
+        ..., help="Thread ID to delete (full ID or prefix)"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
     """Delete a conversation thread and all its messages."""
@@ -713,12 +733,10 @@ def rag_query(
     query: str = typer.Argument(..., help="Search query"),
     limit: int = typer.Option(5, "--limit", "-n", help="Number of results"),
     score_threshold: float = typer.Option(
-        0.0, "--threshold", "-t",
-        help="Minimum similarity score (0.0-1.0)"
+        0.0, "--threshold", "-t", help="Minimum similarity score (0.0-1.0)"
     ),
     config_file: Optional[Path] = typer.Option(
-        None, "--config", "-c",
-        help="Path to config file"
+        None, "--config", "-c", help="Path to config file"
     ),
 ) -> None:
     """Test RAG retrieval with a query (debug/development tool).
@@ -741,9 +759,7 @@ def rag_query(
         async def run_search():
             query_vector = await embedding_service.embed_text(query)
             return qdrant_connector.search(
-                query_vector=query_vector,
-                limit=limit,
-                score_threshold=score_threshold
+                query_vector=query_vector, limit=limit, score_threshold=score_threshold
             )
 
         with console.status("[cyan]Searching...[/cyan]", spinner="dots"):
@@ -776,8 +792,7 @@ def rag_query(
 def rag_list(
     limit: int = typer.Option(20, "--limit", "-n", help="Number to show"),
     config_file: Optional[Path] = typer.Option(
-        None, "--config", "-c",
-        help="Path to config file"
+        None, "--config", "-c", help="Path to config file"
     ),
 ) -> None:
     """List ingested documents."""
@@ -787,9 +802,7 @@ def rag_list(
 
     db = SessionLocal()
     try:
-        stmt = select(Document).order_by(
-            Document.ingested_at.desc()
-        ).limit(limit)
+        stmt = select(Document).order_by(Document.ingested_at.desc()).limit(limit)
         documents = db.execute(stmt).scalars().all()
 
         if not documents:
@@ -814,7 +827,7 @@ def rag_list(
                 source_display,
                 str(doc.chunk_count),
                 f"{doc.token_count:,}",
-                doc.ingested_at.strftime("%Y-%m-%d %H:%M")
+                doc.ingested_at.strftime("%Y-%m-%d %H:%M"),
             )
 
         console.print(table)
@@ -828,13 +841,9 @@ def rag_delete(
     source_path: str = typer.Argument(
         ..., help="Source path to delete (full or partial match)"
     ),
-    force: bool = typer.Option(
-        False, "--force", "-f",
-        help="Skip confirmation"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
     config_file: Optional[Path] = typer.Option(
-        None, "--config", "-c",
-        help="Path to config file"
+        None, "--config", "-c", help="Path to config file"
     ),
 ) -> None:
     """Delete a document from the RAG store."""
@@ -846,17 +855,19 @@ def rag_delete(
     db = SessionLocal()
     try:
         # Find matching documents
-        stmt = select(Document).where(
-            Document.source_path.like(f"%{source_path}%")
-        )
+        stmt = select(Document).where(Document.source_path.like(f"%{source_path}%"))
         documents = db.execute(stmt).scalars().all()
 
         if not documents:
-            console.print(f"[red]Error:[/red] No documents found matching: {source_path}")
+            console.print(
+                f"[red]Error:[/red] No documents found matching: {source_path}"
+            )
             raise typer.Exit(1)
 
         if len(documents) > 1:
-            console.print(f"[red]Error:[/red] Multiple documents match. Be more specific:")
+            console.print(
+                f"[red]Error:[/red] Multiple documents match. Be more specific:"
+            )
             for doc in documents:
                 console.print(f"  - {doc.source_path}")
             raise typer.Exit(1)
@@ -899,8 +910,7 @@ def rag_delete(
 @rag_app.command("info")
 def rag_info(
     config_file: Optional[Path] = typer.Option(
-        None, "--config", "-c",
-        help="Path to config file"
+        None, "--config", "-c", help="Path to config file"
     ),
 ) -> None:
     """Show RAG system statistics."""
@@ -937,7 +947,9 @@ def rag_info(
         console.print(f"  Total Tokens:       {total_tokens:,}")
 
         console.print(f"\n[yellow]Vector Store:[/yellow]")
-        console.print(f"  Points Count:       {collection_info.get('points_count', 0):,}")
+        console.print(
+            f"  Points Count:       {collection_info.get('points_count', 0):,}"
+        )
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -958,7 +970,11 @@ def db_init() -> None:
     Creates all required tables (threads, messages, sessions, message_meta).
     Safe to run multiple times - will not drop existing tables.
     """
-    from .persistence.database_init import init_database, check_database_exists, get_database_info
+    from .persistence.database_init import (
+        init_database,
+        check_database_exists,
+        get_database_info,
+    )
 
     console.print("[bold cyan]Initializing Database[/bold cyan]\n")
 
@@ -988,7 +1004,9 @@ def db_init() -> None:
 
 
 @db_app.command("reset")
-def db_reset(force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")) -> None:
+def db_reset(
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+) -> None:
     """Reset database (DESTRUCTIVE - deletes all data!).
 
     Drops all tables and recreates them. All threads, messages, and sessions will be lost.
@@ -1006,7 +1024,9 @@ def db_reset(force: bool = typer.Option(False, "--force", "-f", help="Skip confi
         console.print("  • Delete ALL message metadata")
         console.print("\n[red]This operation cannot be undone![/red]\n")
 
-        confirm = typer.confirm("Are you absolutely sure you want to reset the database?")
+        confirm = typer.confirm(
+            "Are you absolutely sure you want to reset the database?"
+        )
         if not confirm:
             console.print("[dim]Reset cancelled[/dim]")
             raise typer.Exit(0)
@@ -1056,8 +1076,12 @@ def db_info() -> None:
         meta_count = db.query(func.count(MessageMeta.id)).scalar()
 
         # Get session statistics
-        active_sessions = db.query(func.count(Session.id)).filter(Session.status == "active").scalar()
-        closed_sessions = db.query(func.count(Session.id)).filter(Session.status == "closed").scalar()
+        active_sessions = (
+            db.query(func.count(Session.id)).filter(Session.status == "active").scalar()
+        )
+        closed_sessions = (
+            db.query(func.count(Session.id)).filter(Session.status == "closed").scalar()
+        )
 
         console.print("[bold cyan]Database Statistics[/bold cyan]\n")
 
@@ -1080,6 +1104,7 @@ def db_info() -> None:
         if thread_count > 0:
             # Get most recent thread
             from sqlalchemy import select
+
             stmt = select(Thread).order_by(Thread.updated_at.desc()).limit(1)
             recent_thread = db.execute(stmt).scalar_one_or_none()
 
@@ -1087,7 +1112,9 @@ def db_info() -> None:
                 console.print(f"\n[yellow]Most Recent Thread:[/yellow]")
                 console.print(f"  Title:           {recent_thread.title}")
                 console.print(f"  Messages:        {len(recent_thread.messages)}")
-                console.print(f"  Updated:         {recent_thread.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                console.print(
+                    f"  Updated:         {recent_thread.updated_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
 
     except Exception as e:
         console.print(f"[red]Error retrieving database info:[/red] {e}")
@@ -1116,7 +1143,9 @@ def providers_list(
 
     if not cfg.providers:
         console.print("[yellow]No providers configured[/yellow]")
-        console.print("\n[dim]Add providers to your config file or use 'agent config --init'[/dim]")
+        console.print(
+            "\n[dim]Add providers to your config file or use 'agent config --init'[/dim]"
+        )
         return
 
     console.print("[bold cyan]Available Providers[/bold cyan]\n")
@@ -1133,7 +1162,9 @@ def providers_list(
         table.add_row(provider.name, provider.model, is_default, base_url)
 
     console.print(table)
-    console.print(f"\n[dim]Default provider: [cyan]{cfg.default_provider or 'None'}[/cyan][/dim]")
+    console.print(
+        f"\n[dim]Default provider: [cyan]{cfg.default_provider or 'None'}[/cyan][/dim]"
+    )
 
 
 @providers_app.command("set")
@@ -1147,8 +1178,8 @@ def providers_set(
     # Determine config file path
     if config_file is None:
         default_paths = [
-            Path.home() / ".config" / "agent" / "config.yaml",
-            Path.home() / ".local" / "agent" / "config.yaml",
+            Path.home() / ".config" / "local-agent" / "config.yaml",
+            Path.home() / ".local" / "share" / "local-agent" / "config.yaml",
             Path.cwd() / ".agent" / "config.yaml",
         ]
         for path in default_paths:
@@ -1183,7 +1214,9 @@ def providers_set(
     # Save config
     try:
         save_config(cfg, config_file)
-        console.print(f"[green]✓[/green] Default provider set to: [cyan]{provider_name}[/cyan]")
+        console.print(
+            f"[green]✓[/green] Default provider set to: [cyan]{provider_name}[/cyan]"
+        )
         console.print(f"[dim]Config saved to: {config_file}[/dim]")
     except Exception as e:
         console.print(f"[red]Error saving config:[/red] {e}")
@@ -1197,11 +1230,21 @@ app.add_typer(logs_app, name="logs")
 
 @logs_app.command("list")
 def logs_list(
-    limit: int = typer.Option(50, "--limit", "-n", help="Maximum number of entries to show"),
-    event_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by event type"),
-    session: Optional[str] = typer.Option(None, "--session", "-s", help="Filter by session ID (prefix)"),
-    since: Optional[str] = typer.Option(None, "--since", help="Show logs since date (YYYY-MM-DD)"),
-    until: Optional[str] = typer.Option(None, "--until", help="Show logs until date (YYYY-MM-DD)"),
+    limit: int = typer.Option(
+        50, "--limit", "-n", help="Maximum number of entries to show"
+    ),
+    event_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Filter by event type"
+    ),
+    session: Optional[str] = typer.Option(
+        None, "--session", "-s", help="Filter by session ID (prefix)"
+    ),
+    since: Optional[str] = typer.Option(
+        None, "--since", help="Show logs since date (YYYY-MM-DD)"
+    ),
+    until: Optional[str] = typer.Option(
+        None, "--until", help="Show logs until date (YYYY-MM-DD)"
+    ),
     config_file: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to config file"
     ),
@@ -1229,14 +1272,18 @@ def logs_list(
         try:
             since_dt = datetime.fromisoformat(since)
         except ValueError:
-            console.print(f"[red]Error:[/red] Invalid date format for --since. Use YYYY-MM-DD")
+            console.print(
+                f"[red]Error:[/red] Invalid date format for --since. Use YYYY-MM-DD"
+            )
             raise typer.Exit(1)
     if until:
         try:
             until_dt = datetime.fromisoformat(until)
             until_dt = until_dt.replace(hour=23, minute=59, second=59)
         except ValueError:
-            console.print(f"[red]Error:[/red] Invalid date format for --until. Use YYYY-MM-DD")
+            console.print(
+                f"[red]Error:[/red] Invalid date format for --until. Use YYYY-MM-DD"
+            )
             raise typer.Exit(1)
 
     # Collect log entries
@@ -1249,28 +1296,30 @@ def logs_list(
                 for line in f:
                     try:
                         entry = json.loads(line)
-                        
+
                         # Apply filters
                         if event_type and entry.get("event_type") != event_type:
                             continue
-                        if session and not entry.get("session_id", "").startswith(session):
+                        if session and not entry.get("session_id", "").startswith(
+                            session
+                        ):
                             continue
-                        
+
                         # Date filtering
                         timestamp = datetime.fromisoformat(entry["timestamp"])
                         if since_dt and timestamp < since_dt:
                             continue
                         if until_dt and timestamp > until_dt:
                             continue
-                        
+
                         entries.append(entry)
-                        
+
                         if len(entries) >= limit:
                             break
                     except (json.JSONDecodeError, KeyError):
                         # Skip invalid entries
                         continue
-            
+
             if len(entries) >= limit:
                 break
         except Exception:
@@ -1283,7 +1332,9 @@ def logs_list(
         return
 
     # Display results
-    console.print(f"\n[bold cyan]Audit Log Entries[/bold cyan] [dim]({len(entries)} entries)[/dim]\n")
+    console.print(
+        f"\n[bold cyan]Audit Log Entries[/bold cyan] [dim]({len(entries)} entries)[/dim]\n"
+    )
 
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Time", style="cyan", width=16)
@@ -1292,9 +1343,11 @@ def logs_list(
     table.add_column("Status", style="green", width=10)
 
     for entry in entries:
-        timestamp = datetime.fromisoformat(entry["timestamp"]).strftime("%m-%d %H:%M:%S")
+        timestamp = datetime.fromisoformat(entry["timestamp"]).strftime(
+            "%m-%d %H:%M:%S"
+        )
         event_type = entry.get("event_type", "")
-        
+
         # Build details string
         details = []
         if entry.get("tool_name"):
@@ -1304,7 +1357,7 @@ def logs_list(
         if entry.get("session_id"):
             details.append(f"session:{entry['session_id'][:8]}")
         details_str = " | ".join(details) if details else "-"
-        
+
         # Status
         status = ""
         if entry.get("success") is True:
@@ -1315,7 +1368,7 @@ def logs_list(
             status = "[green]✓[/green]"
         elif entry.get("approved") is False:
             status = "[red]✗[/red]"
-        
+
         table.add_row(timestamp, event_type, details_str, status)
 
     console.print(table)
@@ -1360,7 +1413,7 @@ def logs_show(
         return
 
     log_file = matching_files[0]
-    
+
     # Read all entries
     entries = []
     try:
@@ -1380,35 +1433,51 @@ def logs_show(
 
     # Display session summary
     first_entry = entries[0]
-    console.print(f"\n[bold cyan]Session:[/bold cyan] {first_entry.get('session_id', 'unknown')}")
-    if first_entry.get('thread_id'):
+    console.print(
+        f"\n[bold cyan]Session:[/bold cyan] {first_entry.get('session_id', 'unknown')}"
+    )
+    if first_entry.get("thread_id"):
         console.print(f"[bold cyan]Thread:[/bold cyan] {first_entry['thread_id']}")
-    console.print(f"[bold cyan]Started:[/bold cyan] {datetime.fromisoformat(entries[0]['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}")
+    console.print(
+        f"[bold cyan]Started:[/bold cyan] {datetime.fromisoformat(entries[0]['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     console.print(f"[bold cyan]Entries:[/bold cyan] {len(entries)}\n")
 
     # Count event types
-    tool_calls = sum(1 for e in entries if e.get('event_type') == 'tool_call')
-    approvals = sum(1 for e in entries if e.get('event_type') == 'approval')
-    successes = sum(1 for e in entries if e.get('event_type') == 'tool_call' and e.get('success'))
-    failures = sum(1 for e in entries if e.get('event_type') == 'tool_call' and not e.get('success'))
+    tool_calls = sum(1 for e in entries if e.get("event_type") == "tool_call")
+    approvals = sum(1 for e in entries if e.get("event_type") == "approval")
+    successes = sum(
+        1 for e in entries if e.get("event_type") == "tool_call" and e.get("success")
+    )
+    failures = sum(
+        1
+        for e in entries
+        if e.get("event_type") == "tool_call" and not e.get("success")
+    )
 
-    console.print(f"[dim]Tool calls: {tool_calls} | Approvals: {approvals} | Success: {successes} | Failures: {failures}[/dim]\n")
+    console.print(
+        f"[dim]Tool calls: {tool_calls} | Approvals: {approvals} | Success: {successes} | Failures: {failures}[/dim]\n"
+    )
 
     # Display entries
     for i, entry in enumerate(entries, 1):
-        timestamp = datetime.fromisoformat(entry['timestamp']).strftime('%H:%M:%S')
-        event_type = entry.get('event_type', 'unknown')
-        
-        if event_type == 'tool_call':
-            status = "✓" if entry.get('success') else "✗"
-            color = "green" if entry.get('success') else "red"
-            console.print(f"[{color}]{status}[/{color}] [{timestamp}] [yellow]{event_type}[/yellow] - [bold]{entry.get('tool_name')}[/bold]")
-            if entry.get('error'):
+        timestamp = datetime.fromisoformat(entry["timestamp"]).strftime("%H:%M:%S")
+        event_type = entry.get("event_type", "unknown")
+
+        if event_type == "tool_call":
+            status = "✓" if entry.get("success") else "✗"
+            color = "green" if entry.get("success") else "red"
+            console.print(
+                f"[{color}]{status}[/{color}] [{timestamp}] [yellow]{event_type}[/yellow] - [bold]{entry.get('tool_name')}[/bold]"
+            )
+            if entry.get("error"):
                 console.print(f"    [red]Error:[/red] {entry['error']}")
-        elif event_type == 'approval':
-            status = "✓" if entry.get('approved') else "✗"
-            color = "green" if entry.get('approved') else "red"
-            console.print(f"[{color}]{status}[/{color}] [{timestamp}] [yellow]{event_type}[/yellow] - {entry.get('tool_name')}")
+        elif event_type == "approval":
+            status = "✓" if entry.get("approved") else "✗"
+            color = "green" if entry.get("approved") else "red"
+            console.print(
+                f"[{color}]{status}[/{color}] [{timestamp}] [yellow]{event_type}[/yellow] - {entry.get('tool_name')}"
+            )
         else:
             console.print(f"  [{timestamp}] [yellow]{event_type}[/yellow]")
 
@@ -1445,7 +1514,7 @@ def logs_tail(
                 for line in f:
                     try:
                         entry = json.loads(line)
-                        entry['_file'] = log_file.name
+                        entry["_file"] = log_file.name
                         entries.append(entry)
                     except json.JSONDecodeError:
                         continue
@@ -1453,27 +1522,35 @@ def logs_tail(
             continue
 
     # Sort by timestamp and take last N
-    entries.sort(key=lambda e: e['timestamp'])
+    entries.sort(key=lambda e: e["timestamp"])
     recent = entries[-lines:]
 
     if not recent:
         console.print("[yellow]No log entries found[/yellow]")
         return
 
-    console.print(f"\n[bold cyan]Recent Log Entries[/bold cyan] [dim](last {len(recent)})[/dim]\n")
+    console.print(
+        f"\n[bold cyan]Recent Log Entries[/bold cyan] [dim](last {len(recent)})[/dim]\n"
+    )
 
     for entry in recent:
-        timestamp = datetime.fromisoformat(entry['timestamp']).strftime('%m-%d %H:%M:%S')
-        event_type = entry.get('event_type', '')
-        
-        if event_type == 'tool_call':
-            status = "✓" if entry.get('success') else "✗"
-            color = "green" if entry.get('success') else "red"
-            console.print(f"[{color}]{status}[/{color}] [{timestamp}] {entry.get('tool_name')}")
-        elif event_type == 'approval':
-            status = "✓" if entry.get('approved') else "✗"
-            color = "green" if entry.get('approved') else "red"
-            console.print(f"[{color}]{status}[/{color}] [{timestamp}] approval: {entry.get('tool_name')}")
+        timestamp = datetime.fromisoformat(entry["timestamp"]).strftime(
+            "%m-%d %H:%M:%S"
+        )
+        event_type = entry.get("event_type", "")
+
+        if event_type == "tool_call":
+            status = "✓" if entry.get("success") else "✗"
+            color = "green" if entry.get("success") else "red"
+            console.print(
+                f"[{color}]{status}[/{color}] [{timestamp}] {entry.get('tool_name')}"
+            )
+        elif event_type == "approval":
+            status = "✓" if entry.get("approved") else "✗"
+            color = "green" if entry.get("approved") else "red"
+            console.print(
+                f"[{color}]{status}[/{color}] [{timestamp}] approval: {entry.get('tool_name')}"
+            )
         else:
             console.print(f"  [{timestamp}] {event_type}")
 
@@ -1481,10 +1558,18 @@ def logs_tail(
 @logs_app.command("export")
 def logs_export(
     output: Path = typer.Argument(..., help="Output file path (.json or .csv)"),
-    event_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by event type"),
-    session: Optional[str] = typer.Option(None, "--session", "-s", help="Filter by session ID (prefix)"),
-    since: Optional[str] = typer.Option(None, "--since", help="Export logs since date (YYYY-MM-DD)"),
-    until: Optional[str] = typer.Option(None, "--until", help="Export logs until date (YYYY-MM-DD)"),
+    event_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Filter by event type"
+    ),
+    session: Optional[str] = typer.Option(
+        None, "--session", "-s", help="Filter by session ID (prefix)"
+    ),
+    since: Optional[str] = typer.Option(
+        None, "--since", help="Export logs since date (YYYY-MM-DD)"
+    ),
+    until: Optional[str] = typer.Option(
+        None, "--until", help="Export logs until date (YYYY-MM-DD)"
+    ),
     config_file: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to config file"
     ),
@@ -1530,19 +1615,21 @@ def logs_export(
                 for line in f:
                     try:
                         entry = json.loads(line)
-                        
+
                         # Apply filters
                         if event_type and entry.get("event_type") != event_type:
                             continue
-                        if session and not entry.get("session_id", "").startswith(session):
+                        if session and not entry.get("session_id", "").startswith(
+                            session
+                        ):
                             continue
-                        
+
                         timestamp = datetime.fromisoformat(entry["timestamp"])
                         if since_dt and timestamp < since_dt:
                             continue
                         if until_dt and timestamp > until_dt:
                             continue
-                        
+
                         entries.append(entry)
                     except (json.JSONDecodeError, KeyError):
                         continue
@@ -1555,25 +1642,30 @@ def logs_export(
 
     # Export
     try:
-        if output.suffix == '.json':
-            with open(output, 'w') as f:
+        if output.suffix == ".json":
+            with open(output, "w") as f:
                 json.dump(entries, f, indent=2)
-        elif output.suffix == '.csv':
+        elif output.suffix == ".csv":
             # Get all unique keys
             all_keys = set()
             for entry in entries:
                 all_keys.update(entry.keys())
             fieldnames = sorted(all_keys)
-            
-            with open(output, 'w', newline='') as f:
+
+            with open(output, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 for entry in entries:
                     # Convert non-string values to strings for CSV
-                    row = {k: json.dumps(v) if isinstance(v, (dict, list)) else v for k, v in entry.items()}
+                    row = {
+                        k: json.dumps(v) if isinstance(v, (dict, list)) else v
+                        for k, v in entry.items()
+                    }
                     writer.writerow(row)
         else:
-            console.print(f"[red]Error:[/red] Unsupported file format. Use .json or .csv")
+            console.print(
+                f"[red]Error:[/red] Unsupported file format. Use .json or .csv"
+            )
             raise typer.Exit(1)
 
         console.print(f"[green]✓[/green] Exported {len(entries)} entries to: {output}")
@@ -1629,28 +1721,28 @@ def logs_stats(
                     try:
                         entry = json.loads(line)
                         total_entries += 1
-                        
-                        event_types[entry.get('event_type', 'unknown')] += 1
-                        
-                        if entry.get('session_id'):
-                            sessions.add(entry['session_id'])
-                        if entry.get('thread_id'):
-                            threads.add(entry['thread_id'])
-                        
-                        if entry.get('event_type') == 'tool_call':
-                            tool_calls[entry.get('tool_name', 'unknown')] += 1
-                            if entry.get('success'):
+
+                        event_types[entry.get("event_type", "unknown")] += 1
+
+                        if entry.get("session_id"):
+                            sessions.add(entry["session_id"])
+                        if entry.get("thread_id"):
+                            threads.add(entry["thread_id"])
+
+                        if entry.get("event_type") == "tool_call":
+                            tool_calls[entry.get("tool_name", "unknown")] += 1
+                            if entry.get("success"):
                                 successes += 1
                             else:
                                 failures += 1
-                        
-                        if entry.get('event_type') == 'approval':
-                            if entry.get('approved'):
+
+                        if entry.get("event_type") == "approval":
+                            if entry.get("approved"):
                                 approvals_granted += 1
                             else:
                                 approvals_denied += 1
-                        
-                        timestamp = datetime.fromisoformat(entry['timestamp'])
+
+                        timestamp = datetime.fromisoformat(entry["timestamp"])
                         if earliest is None or timestamp < earliest:
                             earliest = timestamp
                         if latest is None or timestamp > latest:
@@ -1662,14 +1754,16 @@ def logs_stats(
 
     # Display statistics
     console.print("\n[bold cyan]Audit Log Statistics[/bold cyan]\n")
-    
+
     console.print(f"[bold]Overview[/bold]")
     console.print(f"  Total log files: {len(log_files)}")
     console.print(f"  Total entries: {total_entries}")
     console.print(f"  Unique sessions: {len(sessions)}")
     console.print(f"  Unique threads: {len(threads)}")
     if earliest and latest:
-        console.print(f"  Date range: {earliest.strftime('%Y-%m-%d')} to {latest.strftime('%Y-%m-%d')}")
+        console.print(
+            f"  Date range: {earliest.strftime('%Y-%m-%d')} to {latest.strftime('%Y-%m-%d')}"
+        )
     console.print()
 
     console.print(f"[bold]Event Types[/bold]")
@@ -1700,7 +1794,9 @@ def logs_stats(
 
 @logs_app.command("clean")
 def logs_clean(
-    older_than: int = typer.Option(30, "--older-than", help="Remove logs older than N days"),
+    older_than: int = typer.Option(
+        30, "--older-than", help="Remove logs older than N days"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
     config_file: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to config file"
@@ -1722,31 +1818,37 @@ def logs_clean(
         return
 
     cutoff_date = datetime.now() - timedelta(days=older_than)
-    
+
     # Find old log files
     old_files = []
     for log_file in log_dir.glob("session_*.jsonl"):
         try:
             # Parse timestamp from filename: session_20240110_103000_abc123.jsonl
-            parts = log_file.stem.split('_')
+            parts = log_file.stem.split("_")
             if len(parts) >= 3:
                 file_date_str = f"{parts[1]}_{parts[2]}"
                 file_date = datetime.strptime(file_date_str, "%Y%m%d_%H%M%S")
-                
+
                 if file_date < cutoff_date:
                     old_files.append((log_file, file_date))
         except Exception:
             continue
 
     if not old_files:
-        console.print(f"[yellow]No log files older than {older_than} days found[/yellow]")
+        console.print(
+            f"[yellow]No log files older than {older_than} days found[/yellow]"
+        )
         return
 
     # Show files to be deleted
-    console.print(f"\n[bold yellow]Found {len(old_files)} log files older than {older_than} days:[/bold yellow]\n")
+    console.print(
+        f"\n[bold yellow]Found {len(old_files)} log files older than {older_than} days:[/bold yellow]\n"
+    )
     for log_file, file_date in old_files[:10]:
-        console.print(f"  - {log_file.name} [dim]({file_date.strftime('%Y-%m-%d')})[/dim]")
-    
+        console.print(
+            f"  - {log_file.name} [dim]({file_date.strftime('%Y-%m-%d')})[/dim]"
+        )
+
     if len(old_files) > 10:
         console.print(f"  [dim]... and {len(old_files) - 10} more[/dim]")
 
@@ -1777,35 +1879,39 @@ app.add_typer(memory_app, name="memory")
 @memory_app.command("view")
 def memory_view() -> None:
     """Display the contents of Nova's memory file."""
-    memory_path = Path.home() / ".local" / "share" / "local-agent" / "memory" / "nova.txt"
-    
+    memory_path = (
+        Path.home() / ".local" / "share" / "local-agent" / "memory" / "nova.txt"
+    )
+
     if not memory_path.exists():
         console.print(f"[yellow]Memory file not found:[/yellow] {memory_path}")
-        console.print("[dim]Nova's memory file will be created when the agent writes to it[/dim]")
+        console.print(
+            "[dim]Nova's memory file will be created when the agent writes to it[/dim]"
+        )
         return
-    
+
     try:
         content = memory_path.read_text()
-        
+
         if not content.strip():
             console.print(f"[yellow]Memory file is empty[/yellow]")
             console.print(f"[dim]Location: {memory_path}[/dim]")
             return
-        
+
         # Display header
         console.print(f"\n[bold cyan]Nova's Memory[/bold cyan]")
         console.print(f"[dim]Location: {memory_path}[/dim]")
         console.print("[dim]" + "─" * 80 + "[/dim]\n")
-        
+
         # Display content
         console.print(content)
-        
+
         # Display footer with stats
-        lines = content.count('\n') + 1
+        lines = content.count("\n") + 1
         chars = len(content)
         console.print(f"\n[dim]" + "─" * 80 + "[/dim]")
         console.print(f"[dim]{lines} lines, {chars} characters[/dim]")
-        
+
     except Exception as e:
         console.print(f"[red]Error reading memory file:[/red] {e}")
         raise typer.Exit(1)
@@ -1894,7 +2000,7 @@ def identity_show(
     console.print(content)
 
     # Footer
-    lines = content.count('\n') + 1
+    lines = content.count("\n") + 1
     chars = len(content)
     console.print(f"\n[dim]" + "─" * 80 + "[/dim]")
     console.print(f"[dim]{lines} lines, {chars} characters[/dim]")
@@ -1921,7 +2027,10 @@ def identity_set(
 def identity_new(
     name: str = typer.Argument(..., help="Name for the new identity"),
     from_file: Optional[Path] = typer.Option(
-        None, "--from-file", "-f", help="Import content from a file instead of interactive input"
+        None,
+        "--from-file",
+        "-f",
+        help="Import content from a file instead of interactive input",
     ),
 ) -> None:
     """Create a new identity with interactive Rich prompt."""
@@ -1947,7 +2056,9 @@ def identity_new(
         # Interactive prompt
         console.print(f"\n[bold cyan]Creating new identity: {name}[/bold cyan]")
         console.print("[dim]Enter your identity/system prompt below.[/dim]")
-        console.print("[dim]When finished, enter a blank line followed by 'END' on its own line.[/dim]\n")
+        console.print(
+            "[dim]When finished, enter a blank line followed by 'END' on its own line.[/dim]\n"
+        )
 
         lines = []
         while True:
@@ -1978,13 +2089,13 @@ def identity_new(
 
         # Ask if user wants to set as active
         set_active = Prompt.ask(
-            "\nSet as active identity?",
-            choices=["y", "n"],
-            default="n"
+            "\nSet as active identity?", choices=["y", "n"], default="n"
         )
         if set_active.lower() == "y":
             manager.set_active(name)
-            console.print(f"[green]✓[/green] Active identity set to: [cyan]{name}[/cyan]")
+            console.print(
+                f"[green]✓[/green] Active identity set to: [cyan]{name}[/cyan]"
+            )
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -2023,9 +2134,7 @@ def identity_import(
 @identity_app.command("delete")
 def identity_delete(
     name: str = typer.Argument(..., help="Identity name to delete"),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Skip confirmation prompt"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ) -> None:
     """Delete a custom identity (built-in identities are protected)."""
     from rich.prompt import Confirm

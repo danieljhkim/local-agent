@@ -11,9 +11,7 @@ from ..models import (
 )
 from ..session_manager import SessionManager
 
-router = APIRouter(
-    prefix="/api/sessions/{session_id}/approvals", tags=["approvals"]
-)
+router = APIRouter(prefix="/api/sessions/{session_id}/approvals", tags=["approvals"])
 
 
 @router.get("/pending", response_model=PendingApprovalsResponse)

@@ -123,6 +123,4 @@ class OpenAIProvider(LLMProvider):
 
                 finish_reason = chunk.choices[0].finish_reason
 
-                yield CompletionResponse(
-                    content=content, finish_reason=finish_reason
-                )
+                yield CompletionResponse(content=content, finish_reason=finish_reason)

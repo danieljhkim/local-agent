@@ -87,11 +87,12 @@ class AgentRuntime:
         self.max_turns = 20
         self.total_tool_calls = 0
         self.session_start_time = time.time()
-        
+
         # Load system prompt from identity manager if not provided
         if system_prompt is None:
             try:
                 from ..identities import get_identity_manager
+
                 manager = get_identity_manager()
                 self.system_prompt = manager.get_active_content()
             except Exception:
@@ -99,7 +100,7 @@ class AgentRuntime:
                 self.system_prompt = DEFAULT_SYSTEM_PROMPT
         else:
             self.system_prompt = system_prompt
-        
+
         # Track recent tool calls to detect infinite loops
         self.recent_tool_calls: List[Tuple[str, str]] = []  # (tool_name, params_hash)
         self.max_duplicate_calls = 3  # Stop if same tool called 3+ times in a row
@@ -107,7 +108,12 @@ class AgentRuntime:
         # Initialize database if thread_id provided
         if thread_id:
             from ..persistence.db import SessionLocal
-            from ..persistence.db_models import Thread, Message as DBMessage, Session as DBSession
+            from ..persistence.db_models import (
+                Thread,
+                Message as DBMessage,
+                Session as DBSession,
+            )
+
             self.db_session = SessionLocal()
             self.DBMessage = DBMessage
             self.Thread = Thread
@@ -118,6 +124,7 @@ class AgentRuntime:
             if thread:
                 # Load existing messages
                 from sqlalchemy import select
+
                 stmt = (
                     select(DBMessage)
                     .where(DBMessage.thread_id == thread_id)
@@ -128,7 +135,7 @@ class AgentRuntime:
                 for msg in db_messages:
                     content = msg.content
                     # Try to parse JSON-encoded structured content (for Anthropic tool use)
-                    if msg.content and msg.content.strip().startswith('['):
+                    if msg.content and msg.content.strip().startswith("["):
                         try:
                             content = json.loads(msg.content)
                         except json.JSONDecodeError:
@@ -158,7 +165,7 @@ class AgentRuntime:
                 client_type="cli",  # Default to CLI, can be overridden later
                 status="active",
                 provider=config.default_provider,
-                model=getattr(self.provider, 'model', None),
+                model=getattr(self.provider, "model", None),
                 total_turns=0,
                 total_tool_calls=0,
             )
@@ -226,23 +233,26 @@ class AgentRuntime:
             qdrant_connector.ensure_collection()
 
             register_rag_tools(
-                registry,
-                embedding_service,
-                qdrant_connector,
-                self.config.rag
+                registry, embedding_service, qdrant_connector, self.config.rag
             )
 
-            self.audit_logger.log_event("rag_tools_registered", {
-                "collection": self.config.qdrant.collection_name,
-                "embedding_model": self.config.embedding.model
-            })
+            self.audit_logger.log_event(
+                "rag_tools_registered",
+                {
+                    "collection": self.config.qdrant.collection_name,
+                    "embedding_model": self.config.embedding.model,
+                },
+            )
 
         except Exception as e:
             # Log warning but continue - RAG tools are optional
-            self.audit_logger.log_event("rag_tools_unavailable", {
-                "reason": str(e),
-                "message": "Agent will function without RAG capabilities"
-            })
+            self.audit_logger.log_event(
+                "rag_tools_unavailable",
+                {
+                    "reason": str(e),
+                    "message": "Agent will function without RAG capabilities",
+                },
+            )
 
         return registry
 
@@ -289,7 +299,10 @@ class AgentRuntime:
                     tokens_out=getattr(response, "tokens_out", None),
                     tool_calls_json=(
                         json.dumps(
-                            [{"name": tc.name, "id": tc.id} for tc in response.tool_calls]
+                            [
+                                {"name": tc.name, "id": tc.id}
+                                for tc in response.tool_calls
+                            ]
                         )
                         if response.tool_calls
                         else None
@@ -434,9 +447,7 @@ class AgentRuntime:
 
         return coerced
 
-    def _format_tool_results(
-        self, results: List[Tuple[ToolCall, ToolResult]]
-    ) -> str:
+    def _format_tool_results(self, results: List[Tuple[ToolCall, ToolResult]]) -> str:
         """Format tool execution results for LLM consumption.
 
         Args:
@@ -497,34 +508,32 @@ class AgentRuntime:
             List of ToolCall objects
         """
         tool_calls = []
-        
+
         # Try to find JSON objects in the text that look like tool calls
         # Pattern: {"name": "tool_name", "parameters": {...}}
-        json_pattern = r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[^}]+\})\s*\}'
-        
+        json_pattern = (
+            r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[^}]+\})\s*\}'
+        )
+
         matches = re.finditer(json_pattern, text, re.DOTALL)
         for i, match in enumerate(matches):
             try:
                 tool_name = match.group(1)
                 params_str = match.group(2)
                 parameters = json.loads(params_str)
-                
+
                 # Generate a tool call ID
                 tool_id = f"call_{uuid.uuid4().hex[:8]}"
-                
-                tool_calls.append(ToolCall(
-                    id=tool_id,
-                    name=tool_name,
-                    parameters=parameters
-                ))
+
+                tool_calls.append(
+                    ToolCall(id=tool_id, name=tool_name, parameters=parameters)
+                )
             except (json.JSONDecodeError, KeyError):
                 continue
-        
+
         return tool_calls
 
-    async def execute(
-        self, user_message: str, system_prompt: str | None = None
-    ) -> str:
+    async def execute(self, user_message: str, system_prompt: str | None = None) -> str:
         """Execute agent task with agentic loop.
 
         Args:
@@ -541,8 +550,12 @@ class AgentRuntime:
         if not self.message_history:
             # Only add system prompt on first message
             # Priority: explicit parameter > instance system_prompt > DEFAULT_SYSTEM_PROMPT
-            effective_prompt = system_prompt or self.system_prompt or DEFAULT_SYSTEM_PROMPT
-            self.message_history.append(Message(role="system", content=effective_prompt))
+            effective_prompt = (
+                system_prompt or self.system_prompt or DEFAULT_SYSTEM_PROMPT
+            )
+            self.message_history.append(
+                Message(role="system", content=effective_prompt)
+            )
 
         # Add user message
         self.message_history.append(Message(role="user", content=user_message))
@@ -574,7 +587,11 @@ class AgentRuntime:
             llm_latency_ms = int((time.time() - llm_start_time) * 1000)
 
             # For Ollama, try to parse tool calls from text if no native tool calls
-            if isinstance(self.provider, OllamaProvider) and not response.tool_calls and response.content:
+            if (
+                isinstance(self.provider, OllamaProvider)
+                and not response.tool_calls
+                and response.content
+            ):
                 parsed_tool_calls = self._parse_tool_calls_from_text(response.content)
                 if parsed_tool_calls:
                     response.tool_calls = parsed_tool_calls
@@ -591,11 +608,14 @@ class AgentRuntime:
             elif response.content:
                 self.console.print(f"\n{response.content}")
                 final_response = response.content
-            
+
             # Persist message
             if response.content:
                 self._persist_message(
-                    "assistant", response.content, response=response, latency_ms=llm_latency_ms
+                    "assistant",
+                    response.content,
+                    response=response,
+                    latency_ms=llm_latency_ms,
                 )
 
             # Check if done (no tool calls)
@@ -613,30 +633,31 @@ class AgentRuntime:
             # Check for infinite tool call loops
             # Create a signature for each tool call (name + sorted params)
             import hashlib
+
             for tool_call in response.tool_calls:
                 # Create deterministic hash of tool name and parameters
                 params_str = json.dumps(tool_call.parameters, sort_keys=True)
                 call_signature = f"{tool_call.name}:{params_str}"
                 call_hash = hashlib.md5(call_signature.encode()).hexdigest()[:8]
-                
+
                 # Add to recent calls
                 self.recent_tool_calls.append((tool_call.name, call_hash))
-                
+
                 # Keep only last 10 calls
                 if len(self.recent_tool_calls) > 10:
                     self.recent_tool_calls.pop(0)
-            
+
             # Check if we're in a loop (same call repeated multiple times)
             if len(self.recent_tool_calls) >= self.max_duplicate_calls:
                 # Check last N calls
-                last_calls = self.recent_tool_calls[-self.max_duplicate_calls:]
+                last_calls = self.recent_tool_calls[-self.max_duplicate_calls :]
                 if len(set(last_calls)) == 1:  # All the same
                     tool_name = last_calls[0][0]
                     self.console.print(
                         f"\n[red]⚠ Detected infinite loop: {tool_name} called {self.max_duplicate_calls} times with same parameters[/red]"
                     )
                     self.console.print("[yellow]Breaking out of loop...[/yellow]\n")
-                    
+
                     # Add a message to history explaining the issue
                     error_msg = (
                         f"I detected that I was calling the same tool ({tool_name}) repeatedly "
@@ -646,7 +667,7 @@ class AgentRuntime:
                     self.message_history.append(
                         Message(role="assistant", content=error_msg)
                     )
-                    
+
                     # Log the event
                     self.audit_logger.log_event(
                         "infinite_loop_detected",
@@ -656,7 +677,7 @@ class AgentRuntime:
                             "turn": self.turn_count,
                         },
                     )
-                    
+
                     # Break out of the agentic loop
                     final_response = error_msg
                     break
@@ -720,8 +741,13 @@ class AgentRuntime:
                 # Request approval if needed
                 if decision.requires_approval:
                     # Handle both sync (CLI) and async (web) approval workflows
-                    if asyncio.iscoroutinefunction(self.approval_workflow.request_approval):
-                        approved, reason = await self.approval_workflow.request_approval(
+                    if asyncio.iscoroutinefunction(
+                        self.approval_workflow.request_approval
+                    ):
+                        (
+                            approved,
+                            reason,
+                        ) = await self.approval_workflow.request_approval(
                             tool_schema, validated_params
                         )
                     else:
@@ -751,7 +777,8 @@ class AgentRuntime:
                     else:
                         # Run sync handler in executor
                         result = await asyncio.get_event_loop().run_in_executor(
-                            None, functools.partial(tool_schema.handler, **validated_params)
+                            None,
+                            functools.partial(tool_schema.handler, **validated_params),
                         )
                 except Exception as e:
                     # Log the error
@@ -805,40 +832,46 @@ class AgentRuntime:
                 content_blocks = []
                 if response.content:
                     content_blocks.append({"type": "text", "text": response.content})
-                
+
                 # Add tool_use blocks
                 for tc in response.tool_calls:
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc.id,
-                        "name": tc.name,
-                        "input": tc.parameters,
-                    })
-                
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.id,
+                            "name": tc.name,
+                            "input": tc.parameters,
+                        }
+                    )
+
                 self.message_history.append(
                     Message(role="assistant", content=content_blocks)
                 )
                 # Persist as JSON string for structured content
                 if self.thread_id:
                     self._persist_message("assistant", json.dumps(content_blocks))
-                
+
                 # Add tool results as user message with tool_result blocks
                 tool_result_blocks = []
                 for tool_call, result in tool_results:
                     if result.success:
-                        tool_result_blocks.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_call.id,
-                            "content": str(result.result),
-                        })
+                        tool_result_blocks.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_call.id,
+                                "content": str(result.result),
+                            }
+                        )
                     else:
-                        tool_result_blocks.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_call.id,
-                            "content": f"Error: {result.error}",
-                            "is_error": True,
-                        })
-                
+                        tool_result_blocks.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_call.id,
+                                "content": f"Error: {result.error}",
+                                "is_error": True,
+                            }
+                        )
+
                 self.message_history.append(
                     Message(role="user", content=tool_result_blocks)
                 )
@@ -853,7 +886,9 @@ class AgentRuntime:
                     )
                     # Already persisted earlier in the loop
                 else:
-                    tool_calls_summary = ", ".join(tc.name for tc in response.tool_calls)
+                    tool_calls_summary = ", ".join(
+                        tc.name for tc in response.tool_calls
+                    )
                     tool_use_msg = f"I'm using these tools: {tool_calls_summary}"
                     self.message_history.append(
                         Message(
@@ -914,6 +949,7 @@ class AgentRuntime:
                 session_record = self.db_session.get(self.DBSession, self.session_id)
                 if session_record:
                     from ..persistence.db_models import utcnow
+
                     session_record.status = "closed"
                     session_record.ended_at = utcnow()
                     session_record.total_turns = self.turn_count

@@ -8,16 +8,19 @@ from pydantic import BaseModel
 
 class ProviderError(Exception):
     """Base exception for provider errors."""
+
     pass
 
 
 class ProviderConnectionError(ProviderError):
     """Raised when unable to connect to the provider."""
+
     pass
 
 
 class ProviderTimeoutError(ProviderError):
     """Raised when a request to the provider times out."""
+
     pass
 
 

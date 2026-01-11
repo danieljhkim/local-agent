@@ -57,7 +57,7 @@ async def startup():
     # Create storage directory and initialize database
     os.makedirs("storage", exist_ok=True)
     Base.metadata.create_all(bind=engine)
-    
+
     # Start session cleanup
     asyncio.create_task(session_manager.cleanup_inactive_sessions())
 
@@ -73,13 +73,14 @@ async def health_check():
     return {"status": "healthy"}
 
 
-
 # ========================================
 # Thread-based Chat API (Ollama + RAG)
 # ========================================
 
+
 class CreateThreadResponse(BaseModel):
     """Response for creating a new thread."""
+
     thread_id: str
 
 
@@ -106,6 +107,7 @@ def create_thread() -> CreateThreadResponse:
 
 class ChatRequest(BaseModel):
     """Request for thread-based chat."""
+
     thread_id: str
     message: str
     use_rag: bool = True
@@ -113,6 +115,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Response from thread-based chat."""
+
     reply: str
     citations: list[dict]
 

@@ -29,9 +29,7 @@ class PolicyEngine:
         """
         self.config = config
 
-    def evaluate(
-        self, tool: ToolSchema, parameters: Dict[str, Any]
-    ) -> PolicyDecision:
+    def evaluate(self, tool: ToolSchema, parameters: Dict[str, Any]) -> PolicyDecision:
         """Evaluate whether a tool call is allowed.
 
         Args:
