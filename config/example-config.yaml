@@ -1,5 +1,5 @@
 # Local Agent Configuration
-# Copy this file to ~/.config/agent/config.yaml and customize
+# Copy this file to ~/.config/local-agent/config.yaml and customize
 
 # Workspace configuration
 workspace:
@@ -8,6 +8,7 @@ workspace:
     - ~/repos
     - ~/documents
     - ~/projects
+    - ~/.local/share/local-agent/memory
 
   # Explicitly denied paths (these override allowed_roots)
   denied_paths:
@@ -55,7 +56,7 @@ approval_policies:
 # Audit logging configuration
 audit:
   enabled: true
-  log_dir: ~/.local/agent/logs
+  log_dir: ~/.local/share/local-agent/logs
   # Patterns to redact from logs (regex)
   redact_patterns:
     - api[_-]?key
@@ -65,4 +66,4 @@ audit:
     - "-----BEGIN.*PRIVATE KEY-----"
 
 # State storage directory
-state_dir: .local/agent/state
+state_dir: ~/.local/share/local-agent/state

@@ -1777,7 +1777,7 @@ app.add_typer(memory_app, name="memory")
 @memory_app.command("view")
 def memory_view() -> None:
     """Display the contents of Nova's memory file."""
-    memory_path = Path.home() / ".local" / "share" / "nova" / "memory.txt"
+    memory_path = Path.home() / ".local" / "share" / "local-agent" / "memory" / "nova.txt"
     
     if not memory_path.exists():
         console.print(f"[yellow]Memory file not found:[/yellow] {memory_path}")

@@ -54,7 +54,7 @@ class AuditConfig(BaseModel):
 
     enabled: bool = Field(default=True, description="Enable audit logging")
     log_dir: str = Field(
-        default="~/.local/agent/logs", description="Directory for audit logs"
+        default="~/.local/share/local-agent/logs", description="Directory for audit logs"
     )
     redact_patterns: list[str] = Field(
         default_factory=lambda: [
@@ -162,7 +162,7 @@ class AgentConfig(BaseSettings):
     )
     audit: AuditConfig = Field(default_factory=AuditConfig)
     state_dir: str = Field(
-        default="~/.local/agent/state", description="Directory for state storage"
+        default="~/.local/share/local-agent/state", description="Directory for state storage"
     )
     qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)

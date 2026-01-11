@@ -19,9 +19,8 @@ def load_config(config_path: str | Path | None = None) -> AgentConfig:
     if config_path is None:
         # Try default locations
         default_paths = [
-            Path.home() / ".config" / "agent" / "config.yaml",
-            Path.home() / ".local" / "agent" / "config.yaml",
-            Path.cwd() / ".agent" / "config.yaml",
+            Path.home() / ".config" / "local-agent" / "config.yaml",
+            Path.home() / ".local" / "share" / "local-agent" / "config.yaml",
         ]
         for path in default_paths:
             if path.exists():
