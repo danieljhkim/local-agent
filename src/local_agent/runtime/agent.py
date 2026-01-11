@@ -113,6 +113,10 @@ class AgentRuntime:
                             pass
                     self.message_history.append(Message(role=msg.role, content=content))
 
+        # Initialize audit logger early (needed by other components)
+        self.audit_logger = AuditLogger(config.audit, self.session_id)
+        self.console = Console()
+
         # Initialize components (need provider info before creating session record)
         self.provider = self._init_provider()
         self.registry = self._init_registry()
@@ -122,9 +126,6 @@ class AgentRuntime:
         if approval_workflow is None:
             approval_workflow = ApprovalWorkflow()
         self.approval_workflow = approval_workflow
-
-        self.audit_logger = AuditLogger(config.audit, self.session_id)
-        self.console = Console()
 
         # Create session record in database if thread_id provided
         if thread_id and self.db_session:
