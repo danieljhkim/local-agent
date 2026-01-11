@@ -25,17 +25,23 @@ from ..tools.registry import ToolRegistry
 from ..tools.schema import ToolParameter, ToolResult, ToolSchema
 
 # Default system prompt to guide LLM behavior
-DEFAULT_SYSTEM_PROMPT = """You are a helpful AI assistant with access to tools for filesystem operations.
+DEFAULT_SYSTEM_PROMPT = """
+You are a helpful assistant, named Nova. You have access to tools, but you must use them only when strictly necessary.
 
-Guidelines:
-- For simple questions, greetings, or conversations, respond directly without using tools
-- Only use tools when you need to perform actual filesystem operations (read, write, search files)
-- Read files before editing them to understand context
-- Propose changes clearly before writing files
-- If a tool fails, try alternative approaches or report the issue to the user
-- Always verify critical operations completed successfully
+Tool-use rules (strict):
+- Only call a tool if you must perform a real filesystem operation (read/search/write).
+- NEVER invent tool names, tool schemas, parameters, or call IDs.
+- You may ONLY call tools that appear in the provided tool list. If a needed capability is not in the tool list, say so and ask the user how to proceed.
+- For greetings, small talk, opinions, explanations, planning, and code suggestions: DO NOT call tools. Respond normally.
+- If you previously attempted a tool call and it failed, do not fabricate a new tool. Explain the failure in plain text and continue without tools unless the user requests a filesystem action.
 
-Available tools will be provided in the tool schema."""
+Output rules:
+- If no tool is needed, respond with normal natural language only.
+- If a tool is needed, respond with tool calls only (no extra commentary), using exactly the tool schema provided.
+
+Behavior:
+- Be concise by default. Ask one clarifying question only when required to proceed.
+"""
 
 
 class AgentRuntime:
@@ -151,7 +157,7 @@ class AgentRuntime:
         """Convert tool schemas to LLM-compatible format.
 
         Returns:
-            List of tool definitions in Anthropic-compatible format
+            List of tool definitions in provider-specific format
         """
         tools = []
 
@@ -173,17 +179,36 @@ class AgentRuntime:
                 if param.required:
                     required.append(param.name)
 
-            tools.append(
-                {
-                    "name": tool_schema.name,
-                    "description": tool_schema.description,
-                    "input_schema": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required,
-                    },
-                }
-            )
+            # Format based on provider type
+            if isinstance(self.provider, OllamaProvider):
+                # OpenAI-style format for Ollama
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool_schema.name,
+                            "description": tool_schema.description,
+                            "parameters": {
+                                "type": "object",
+                                "properties": properties,
+                                "required": required,
+                            },
+                        },
+                    }
+                )
+            else:
+                # Anthropic-style format (default)
+                tools.append(
+                    {
+                        "name": tool_schema.name,
+                        "description": tool_schema.description,
+                        "input_schema": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required,
+                        },
+                    }
+                )
 
         return tools
 
