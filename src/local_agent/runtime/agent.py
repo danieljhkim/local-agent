@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Tuple
 
 from rich.console import Console
 
+from local_agent.providers.ollama import OllamaProvider
+
 from ..audit.logger import AuditLogger
 from ..config.schema import AgentConfig
 from ..connectors.filesystem import FilesystemConnector
@@ -105,6 +107,8 @@ class AgentRuntime:
                 api_key = os.environ.get("ANTHROPIC_API_KEY")
             elif provider_name == "openai":
                 api_key = os.environ.get("OPENAI_API_KEY")
+            elif provider_name == "ollama":
+                api_key = "default"  # Ollama does not require an API key
 
         if not api_key:
             raise ValueError(
@@ -117,6 +121,12 @@ class AgentRuntime:
             return AnthropicProvider(api_key=api_key, model=provider_config.model)
         elif provider_name == "openai":
             return OpenAIProvider(api_key=api_key, model=provider_config.model)
+        elif provider_name == "ollama":
+            return OllamaProvider(
+                api_key=api_key,
+                model=provider_config.model,
+                base_url=provider_config.base_url,
+            )
         else:
             raise ValueError(f"Unknown provider: {provider_name}")
 
