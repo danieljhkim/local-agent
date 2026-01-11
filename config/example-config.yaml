@@ -1,0 +1,68 @@
+# Local Agent Configuration
+# Copy this file to ~/.config/agent/config.yaml and customize
+
+# Workspace configuration
+workspace:
+  # Allowed root directories for filesystem access
+  allowed_roots:
+    - ~/repos
+    - ~/documents
+    - ~/projects
+
+  # Explicitly denied paths (these override allowed_roots)
+  denied_paths:
+    - ~/.ssh
+    - ~/.aws
+    - ~/Library/Keychains
+    - /etc
+    - /System
+
+# LLM Providers
+providers:
+  # Anthropic (Claude)
+  - name: anthropic
+    model: claude-sonnet-4-20250514
+    api_key: x
+
+  # OpenAI
+  # - name: openai
+  #   model: gpt-4-turbo-preview
+  #   # api_key: sk-...  # Or set OPENAI_API_KEY env var
+
+# Default provider to use (must match a provider name above)
+default_provider: anthropic
+
+# Approval policies for automatic approval of certain tool calls
+approval_policies:
+  # Example: Auto-approve file reads in workspace
+  - tool_pattern: "fs_read_file"
+    auto_approve: true
+
+  # Example: Auto-approve file writes only in a specific directory
+  # - tool_pattern: "fs_write_file"
+  #   auto_approve: true
+  #   conditions:
+  #     path:
+  #       startswith: "/Users/yourname/sandbox"
+
+  # Example: Auto-approve all filesystem search operations
+  - tool_pattern: "fs_search"
+    auto_approve: true
+
+  - tool_pattern: "fs_list_dir"
+    auto_approve: true
+
+# Audit logging configuration
+audit:
+  enabled: true
+  log_dir: ~/.local/agent/logs
+  # Patterns to redact from logs (regex)
+  redact_patterns:
+    - api[_-]?key
+    - token
+    - password
+    - secret
+    - "-----BEGIN.*PRIVATE KEY-----"
+
+# State storage directory
+state_dir: .local/agent/state

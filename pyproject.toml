@@ -1,0 +1,58 @@
+[project]
+name = "local-agent"
+version = "0.1.0"
+description = "A local-first AI agent with tool support and safety-first design"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # CLI
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+
+    # Agent runtime
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+
+    # LLM providers
+    "anthropic>=0.39.0",
+    "openai>=1.54.0",
+
+    # Data validation
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+
+    # Config and serialization
+    "pyyaml>=6.0.1",
+
+    # Async and HTTP
+    "httpx>=0.27.0",
+    "aiofiles>=24.1.0",
+
+    # Security
+    "cryptography>=43.0.0",
+
+    # Google API (for Gmail)
+    "google-auth>=2.35.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-api-python-client>=2.149.0",
+]
+
+[project.scripts]
+agent = "local_agent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/local_agent"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+]
