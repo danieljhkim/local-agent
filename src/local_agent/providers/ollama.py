@@ -34,7 +34,13 @@ class OllamaProvider(LLMProvider):
         self.model = model or os.getenv("OLLAMA_CHAT_MODEL", "llama3.1:8b")
         timeout_str = os.getenv("OLLAMA_TIMEOUT", "120")
         self.timeout = float(timeout_str)
-        self.client = httpx.AsyncClient(timeout=self.timeout)
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Get or create AsyncClient."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def complete(
         self,
@@ -71,7 +77,8 @@ class OllamaProvider(LLMProvider):
 
             # Make API call
             url = f"{self.base_url}/api/chat"
-            response = await self.client.post(url, json=request_data)
+            client = self._get_client()
+            response = await client.post(url, json=request_data)
             response.raise_for_status()
             data = response.json()
 
@@ -148,7 +155,8 @@ class OllamaProvider(LLMProvider):
 
             # Make streaming API call
             url = f"{self.base_url}/api/chat"
-            async with self.client.stream("POST", url, json=request_data) as response:
+            client = self._get_client()
+            async with client.stream("POST", url, json=request_data) as response:
                 response.raise_for_status()
 
                 # Process NDJSON stream
@@ -212,4 +220,5 @@ class OllamaProvider(LLMProvider):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit - cleanup client."""
-        await self.client.aclose()
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
