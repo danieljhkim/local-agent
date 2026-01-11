@@ -38,11 +38,12 @@ Available tools will be provided in the tool schema."""
 class AgentRuntime:
     """Agent runtime orchestration engine."""
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, config: AgentConfig, approval_workflow=None):
         """Initialize agent runtime.
 
         Args:
             config: Agent configuration
+            approval_workflow: Optional approval workflow (defaults to CLI ApprovalWorkflow)
         """
         self.config = config
         self.session_id = str(uuid.uuid4())
@@ -56,7 +57,12 @@ class AgentRuntime:
         self.provider = self._init_provider()
         self.registry = self._init_registry()
         self.policy_engine = PolicyEngine(config)
-        self.approval_workflow = ApprovalWorkflow()
+
+        # Use provided approval workflow or default to CLI version
+        if approval_workflow is None:
+            approval_workflow = ApprovalWorkflow()
+        self.approval_workflow = approval_workflow
+
         self.audit_logger = AuditLogger(config.audit, self.session_id)
         self.console = Console()
 
@@ -406,9 +412,16 @@ class AgentRuntime:
 
                 # Request approval if needed
                 if decision.requires_approval:
-                    approved, reason = self.approval_workflow.request_approval(
-                        tool_schema, validated_params
-                    )
+                    # Handle both sync (CLI) and async (web) approval workflows
+                    if asyncio.iscoroutinefunction(self.approval_workflow.request_approval):
+                        approved, reason = await self.approval_workflow.request_approval(
+                            tool_schema, validated_params
+                        )
+                    else:
+                        approved, reason = self.approval_workflow.request_approval(
+                            tool_schema, validated_params
+                        )
+
                     self.audit_logger.log_approval(tool_call.name, approved, reason)
 
                     if not approved:
