@@ -208,7 +208,7 @@ class AgentRuntime:
         """Initialize tool registry and register tools.
 
         Returns:
-            Tool registry with filesystem tools registered
+            Tool registry with filesystem and RAG tools registered
         """
         registry = ToolRegistry()
 
@@ -217,6 +217,37 @@ class AgentRuntime:
 
         # Register filesystem tools
         register_filesystem_tools(registry, fs_connector)
+
+        # RAG tools (conditional - only if Qdrant is available)
+        try:
+            from .services.embedding import EmbeddingService
+            from .connectors.qdrant import QdrantConnector
+            from .tools.rag import register_rag_tools
+
+            embedding_service = EmbeddingService(self.config.embedding)
+            qdrant_connector = QdrantConnector(self.config.qdrant)
+
+            # Test connection and ensure collection exists
+            qdrant_connector.ensure_collection()
+
+            register_rag_tools(
+                registry,
+                embedding_service,
+                qdrant_connector,
+                self.config.rag
+            )
+
+            self.audit_logger.log_event("rag_tools_registered", {
+                "collection": self.config.qdrant.collection_name,
+                "embedding_model": self.config.embedding.model
+            })
+
+        except Exception as e:
+            # Log warning but continue - RAG tools are optional
+            self.audit_logger.log_event("rag_tools_unavailable", {
+                "reason": str(e),
+                "message": "Agent will function without RAG capabilities"
+            })
 
         return registry
 

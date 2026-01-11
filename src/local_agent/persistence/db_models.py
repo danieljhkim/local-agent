@@ -80,3 +80,23 @@ class MessageMeta(Base):
     tool_calls_json = Column(Text, nullable=True)  # JSON array of tool call info
 
     message = relationship("Message", backref="meta")
+
+
+class Document(Base):
+    """Ingested document metadata for RAG."""
+
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True)  # UUID
+    source_path = Column(String, nullable=False, unique=True, index=True)
+    file_hash = Column(String, nullable=False)  # SHA256 for deduplication
+    file_size_bytes = Column(Integer, nullable=False)
+    chunk_count = Column(Integer, nullable=False)
+    token_count = Column(Integer, nullable=False)
+    ingested_at = Column(DateTime, nullable=False, default=utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utcnow)
+
+    # Metadata
+    file_type = Column(String, nullable=True)  # Extension
+    encoding = Column(String, nullable=True)
+    collection_name = Column(String, nullable=False, default="local_agent_docs")

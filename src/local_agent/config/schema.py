@@ -68,6 +68,65 @@ class AuditConfig(BaseModel):
     )
 
 
+class QdrantConfig(BaseModel):
+    """Qdrant vector database configuration."""
+
+    url: str = Field(
+        default="http://localhost:6333", description="Qdrant server URL"
+    )
+    collection_name: str = Field(
+        default="local_agent_docs",
+        description="Collection name for document embeddings",
+    )
+    vector_size: int = Field(
+        default=768, description="Embedding dimensions (768 for nomic-embed-text)"
+    )
+    timeout: float = Field(default=30.0, description="Request timeout in seconds")
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding service configuration."""
+
+    model: str = Field(
+        default="nomic-embed-text:latest", description="Ollama embedding model"
+    )
+    base_url: str = Field(
+        default="http://localhost:11434", description="Ollama server URL"
+    )
+    batch_size: int = Field(
+        default=32, description="Batch size for embedding generation"
+    )
+    timeout: float = Field(default=120.0, description="Request timeout in seconds")
+
+
+class RAGConfig(BaseModel):
+    """RAG pipeline configuration."""
+
+    chunk_size: int = Field(
+        default=512, description="Target chunk size in tokens (400-800 recommended)"
+    )
+    chunk_overlap: int = Field(
+        default=128, description="Overlap between chunks in tokens"
+    )
+    top_k: int = Field(default=5, description="Default number of retrieval results")
+    score_threshold: float = Field(
+        default=0.0, description="Minimum similarity score (0.0-1.0)"
+    )
+    supported_extensions: list[str] = Field(
+        default_factory=lambda: [
+            ".txt",
+            ".md",
+            ".py",
+            ".js",
+            ".ts",
+            ".json",
+            ".yaml",
+            ".yml",
+        ],
+        description="Supported file extensions",
+    )
+
+
 class AgentConfig(BaseSettings):
     """Main agent configuration."""
 
@@ -85,6 +144,9 @@ class AgentConfig(BaseSettings):
     state_dir: str = Field(
         default="~/.local/agent/state", description="Directory for state storage"
     )
+    qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    rag: RAGConfig = Field(default_factory=RAGConfig)
 
     class Config:
         env_prefix = "AGENT_"

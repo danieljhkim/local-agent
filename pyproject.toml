@@ -52,6 +52,9 @@ dependencies = [
 
     # Tokenization
     "tiktoken==0.8.0",
+
+    # Text encoding detection
+    "chardet>=5.2.0",
 ]
 
 [project.scripts]
