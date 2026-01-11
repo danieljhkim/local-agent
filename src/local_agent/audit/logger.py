@@ -12,15 +12,17 @@ from ..config.schema import AuditConfig
 class AuditLogger:
     """Logger for auditing tool calls and agent actions."""
 
-    def __init__(self, config: AuditConfig, session_id: str):
+    def __init__(self, config: AuditConfig, session_id: str, thread_id: str | None = None):
         """Initialize audit logger.
 
         Args:
             config: Audit configuration
             session_id: Unique session identifier
+            thread_id: Optional thread ID for context
         """
         self.config = config
         self.session_id = session_id
+        self.thread_id = thread_id
         self.log_dir = Path(config.log_dir).expanduser()
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -80,6 +82,7 @@ class AuditLogger:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "session_id": self.session_id,
+            "thread_id": self.thread_id,
             "event_type": "tool_call",
             "tool_name": tool_name,
             "risk_tier": risk_tier,
@@ -108,6 +111,7 @@ class AuditLogger:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "session_id": self.session_id,
+            "thread_id": self.thread_id,
             "event_type": "approval",
             "tool_name": tool_name,
             "approved": approved,
@@ -129,6 +133,7 @@ class AuditLogger:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "session_id": self.session_id,
+            "thread_id": self.thread_id,
             "event_type": event_type,
             **self._redact_sensitive(data),
         }
