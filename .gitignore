@@ -46,3 +46,6 @@ dmypy.json
 # Agent state and config (don't commit user data)
 .agent/
 config.yaml
+
+package-lock.json
+.env

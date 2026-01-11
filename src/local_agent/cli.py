@@ -65,12 +65,12 @@ def chat(
                 continue
 
             # Execute task
-            console.print()
+            # console.print()
             response = asyncio.run(runtime.execute(user_input))
-
-            # Display final response if not already shown
-            if response:
-                console.print(f"\n[bold green]Agent:[/bold green] {response}\n")
+            
+            # Note: Response is already printed by runtime.execute()
+            # Only print if we got a response but nothing was displayed
+            # (this shouldn't happen in normal operation)
 
         except EOFError:
             # Ctrl+D pressed
