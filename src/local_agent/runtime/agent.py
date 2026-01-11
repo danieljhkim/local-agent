@@ -2,7 +2,9 @@
 
 import asyncio
 import functools
+import json
 import os
+import re
 import time
 import traceback
 import uuid
@@ -47,22 +49,55 @@ Behavior:
 class AgentRuntime:
     """Agent runtime orchestration engine."""
 
-    def __init__(self, config: AgentConfig, approval_workflow=None):
+    def __init__(
+        self,
+        config: AgentConfig,
+        approval_workflow=None,
+        thread_id: str | None = None,
+    ):
         """Initialize agent runtime.
 
         Args:
             config: Agent configuration
             approval_workflow: Optional approval workflow (defaults to CLI ApprovalWorkflow)
+            thread_id: Optional thread ID for persistent chat (enables database storage)
         """
         self.config = config
         self.session_id = str(uuid.uuid4())
+        self.thread_id = thread_id
+        self.db_session = None
         self.message_history: List[Message] = []
         self.turn_count = 0
         self.max_turns = 20
         self.total_tool_calls = 0
         self.session_start_time = time.time()
 
-        # Initialize components
+        # Initialize database if thread_id provided
+        if thread_id:
+            from ..persistence.db import SessionLocal
+            from ..persistence.db_models import Thread, Message as DBMessage, Session as DBSession
+            self.db_session = SessionLocal()
+            self.DBMessage = DBMessage
+            self.Thread = Thread
+            self.DBSession = DBSession
+
+            # Load existing thread if it exists
+            thread = self.db_session.get(Thread, thread_id)
+            if thread:
+                # Load existing messages
+                from sqlalchemy import select
+                stmt = (
+                    select(DBMessage)
+                    .where(DBMessage.thread_id == thread_id)
+                    .order_by(DBMessage.created_at)
+                )
+                db_messages = self.db_session.execute(stmt).scalars().all()
+                self.message_history = [
+                    Message(role=msg.role, content=msg.content)
+                    for msg in db_messages
+                ]
+
+        # Initialize components (need provider info before creating session record)
         self.provider = self._init_provider()
         self.registry = self._init_registry()
         self.policy_engine = PolicyEngine(config)
@@ -74,6 +109,21 @@ class AgentRuntime:
 
         self.audit_logger = AuditLogger(config.audit, self.session_id)
         self.console = Console()
+
+        # Create session record in database if thread_id provided
+        if thread_id and self.db_session:
+            session_record = self.DBSession(
+                id=self.session_id,
+                thread_id=thread_id,
+                client_type="cli",  # Default to CLI, can be overridden later
+                status="active",
+                provider=config.default_provider,
+                model=getattr(self.provider, 'model', None),
+                total_turns=0,
+                total_tool_calls=0,
+            )
+            self.db_session.add(session_record)
+            self.db_session.commit()
 
         # Log session start
         self.audit_logger.log_event(
@@ -152,6 +202,69 @@ class AgentRuntime:
         register_filesystem_tools(registry, fs_connector)
 
         return registry
+
+    def _persist_message(
+        self,
+        role: str,
+        content: str,
+        response: CompletionResponse | None = None,
+        latency_ms: int | None = None,
+    ) -> str | None:
+        """Persist a message to the database if thread_id is set.
+
+        Args:
+            role: Message role (user, assistant, system)
+            content: Message content
+            response: Optional LLM response (for assistant messages)
+            latency_ms: Optional latency in milliseconds
+
+        Returns:
+            Message ID if persisted, None otherwise
+        """
+        if self.thread_id and self.db_session:
+            from ..persistence.db_models import utcnow, MessageMeta
+
+            # Create and store message
+            message_id = str(uuid.uuid4())
+            db_msg = self.DBMessage(
+                id=message_id,
+                thread_id=self.thread_id,
+                role=role,
+                content=content,
+            )
+            self.db_session.add(db_msg)
+
+            # Add metadata for assistant messages if response provided
+            if role == "assistant" and response:
+                import json
+
+                meta = MessageMeta(
+                    id=str(uuid.uuid4()),
+                    message_id=message_id,
+                    model=getattr(self.provider, "model", None),
+                    latency_ms=latency_ms,
+                    # Token counts could be extracted from response if provider supports it
+                    tokens_in=getattr(response, "tokens_in", None),
+                    tokens_out=getattr(response, "tokens_out", None),
+                    tool_calls_json=(
+                        json.dumps(
+                            [{"name": tc.name, "id": tc.id} for tc in response.tool_calls]
+                        )
+                        if response.tool_calls
+                        else None
+                    ),
+                )
+                self.db_session.add(meta)
+
+            # Update thread timestamp
+            thread = self.db_session.get(self.Thread, self.thread_id)
+            if thread:
+                thread.updated_at = utcnow()
+
+            self.db_session.commit()
+            return message_id
+
+        return None
 
     def _tools_to_llm_format(self) -> List[Dict[str, Any]]:
         """Convert tool schemas to LLM-compatible format.
@@ -300,7 +413,11 @@ class AgentRuntime:
             if result.success:
                 formatted += "Status: Success\n"
                 result_str = self._truncate_result(result.result)
-                formatted += f"Result: {result_str}\n"
+                # Make empty results explicit
+                if not result_str or result_str.strip() == "":
+                    formatted += "Result: (empty)\n"
+                else:
+                    formatted += f"Result: {result_str}\n"
                 if result.metadata:
                     formatted += f"Metadata: {result.metadata}\n"
             else:
@@ -329,6 +446,41 @@ class AgentRuntime:
             )
         return result_str
 
+    def _parse_tool_calls_from_text(self, text: str) -> List[ToolCall]:
+        """Parse tool calls from text output (for models that don't support native tool calling).
+
+        Args:
+            text: Text content to parse
+
+        Returns:
+            List of ToolCall objects
+        """
+        tool_calls = []
+        
+        # Try to find JSON objects in the text that look like tool calls
+        # Pattern: {"name": "tool_name", "parameters": {...}}
+        json_pattern = r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[^}]+\})\s*\}'
+        
+        matches = re.finditer(json_pattern, text, re.DOTALL)
+        for i, match in enumerate(matches):
+            try:
+                tool_name = match.group(1)
+                params_str = match.group(2)
+                parameters = json.loads(params_str)
+                
+                # Generate a tool call ID
+                tool_id = f"call_{uuid.uuid4().hex[:8]}"
+                
+                tool_calls.append(ToolCall(
+                    id=tool_id,
+                    name=tool_name,
+                    parameters=parameters
+                ))
+            except (json.JSONDecodeError, KeyError):
+                continue
+        
+        return tool_calls
+
     async def execute(
         self, user_message: str, system_prompt: str | None = None
     ) -> str:
@@ -353,6 +505,7 @@ class AgentRuntime:
 
         # Add user message
         self.message_history.append(Message(role="user", content=user_message))
+        self._persist_message("user", user_message)
 
         # Get tool definitions
         tools = self._tools_to_llm_format()
@@ -363,6 +516,7 @@ class AgentRuntime:
             self.turn_count += 1
 
             # Display thinking status
+            llm_start_time = time.time()
             with self.console.status(
                 f"[cyan]Turn {self.turn_count}: Thinking...[/cyan]", spinner="dots"
             ):
@@ -376,10 +530,32 @@ class AgentRuntime:
                     )
                     raise RuntimeError(f"LLM provider error: {str(e)}") from e
 
+            llm_latency_ms = int((time.time() - llm_start_time) * 1000)
+
+            # For Ollama, try to parse tool calls from text if no native tool calls
+            if isinstance(self.provider, OllamaProvider) and not response.tool_calls and response.content:
+                parsed_tool_calls = self._parse_tool_calls_from_text(response.content)
+                if parsed_tool_calls:
+                    response.tool_calls = parsed_tool_calls
+                    # Clear the content to prevent the model from seeing the JSON again
+                    # Replace with a simple statement that tools are being used
+                    tool_names = ", ".join(tc.name for tc in parsed_tool_calls)
+                    response.content = f"Using tools: {tool_names}"
+                    self.console.print("\n[dim]Detected tool call(s) in output[/dim]")
+                else:
+                    # Display normal response
+                    self.console.print(f"\n{response.content}")
+                    final_response = response.content
             # Display and store assistant response
-            if response.content:
-                self.console.print(f"\n[bold green]Assistant:[/bold green] {response.content}")
+            elif response.content:
+                self.console.print(f"\n{response.content}")
                 final_response = response.content
+            
+            # Persist message
+            if response.content:
+                self._persist_message(
+                    "assistant", response.content, response=response, latency_ms=llm_latency_ms
+                )
 
             # Check if done (no tool calls)
             if not response.tool_calls:
@@ -528,26 +704,66 @@ class AgentRuntime:
                 tool_results.append((tool_call, result))
 
             # Add assistant message with tool calls to history
-            # (We'll add a simplified text representation)
-            if response.content:
+            # For Anthropic, we need to structure the assistant message with tool_use blocks
+            if isinstance(self.provider, AnthropicProvider):
+                # Build content blocks for assistant message
+                content_blocks = []
+                if response.content:
+                    content_blocks.append({"type": "text", "text": response.content})
+                
+                # Add tool_use blocks
+                for tc in response.tool_calls:
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc.id,
+                        "name": tc.name,
+                        "input": tc.parameters,
+                    })
+                
                 self.message_history.append(
-                    Message(role="assistant", content=response.content)
+                    Message(role="assistant", content=content_blocks)
+                )
+                
+                # Add tool results as user message with tool_result blocks
+                tool_result_blocks = []
+                for tool_call, result in tool_results:
+                    if result.success:
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_call.id,
+                            "content": str(result.result),
+                        })
+                    else:
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_call.id,
+                            "content": f"Error: {result.error}",
+                            "is_error": True,
+                        })
+                
+                self.message_history.append(
+                    Message(role="user", content=tool_result_blocks)
                 )
             else:
-                # If no content, create a message indicating tool calls were made
-                tool_calls_summary = ", ".join(tc.name for tc in response.tool_calls)
-                self.message_history.append(
-                    Message(
-                        role="assistant",
-                        content=f"I'm using these tools: {tool_calls_summary}",
+                # For other providers (OpenAI, Ollama), use text format
+                if response.content:
+                    self.message_history.append(
+                        Message(role="assistant", content=response.content)
                     )
-                )
+                else:
+                    tool_calls_summary = ", ".join(tc.name for tc in response.tool_calls)
+                    self.message_history.append(
+                        Message(
+                            role="assistant",
+                            content=f"I'm using these tools: {tool_calls_summary}",
+                        )
+                    )
 
-            # Format and add tool results as user message
-            tool_results_content = self._format_tool_results(tool_results)
-            self.message_history.append(
-                Message(role="user", content=tool_results_content)
-            )
+                # Format and add tool results as user message
+                tool_results_content = self._format_tool_results(tool_results)
+                self.message_history.append(
+                    Message(role="user", content=tool_results_content)
+                )
 
         # Check if max turns exceeded
         if self.turn_count >= self.max_turns:
@@ -582,3 +798,26 @@ class AgentRuntime:
             "session_shutdown",
             {"turns": self.turn_count, "tool_calls": self.total_tool_calls},
         )
+
+        # Update session status in database before closing
+        if self.thread_id and self.db_session:
+            try:
+                session_record = self.db_session.get(self.DBSession, self.session_id)
+                if session_record:
+                    from ..persistence.db_models import utcnow
+                    session_record.status = "closed"
+                    session_record.ended_at = utcnow()
+                    session_record.total_turns = self.turn_count
+                    session_record.total_tool_calls = self.total_tool_calls
+                    session_record.updated_at = utcnow()
+                    self.db_session.commit()
+            except Exception as e:
+                # Log error but don't fail shutdown
+                self.audit_logger.log_event(
+                    "session_update_error",
+                    {"error": str(e)},
+                )
+
+        # Close database session if open
+        if self.db_session:
+            self.db_session.close()

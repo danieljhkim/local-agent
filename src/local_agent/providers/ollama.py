@@ -60,9 +60,22 @@ class OllamaProvider(LLMProvider):
         """
         try:
             # Convert messages to Ollama format
-            ollama_messages = [
-                {"role": msg.role, "content": msg.content} for msg in messages
-            ]
+            ollama_messages = []
+            for msg in messages:
+                content = msg.content
+                # Handle structured content (from Anthropic-style messages)
+                if isinstance(content, list):
+                    # Convert structured blocks to text
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            if block.get("type") == "text":
+                                text_parts.append(block.get("text", ""))
+                            elif block.get("type") == "tool_result":
+                                # Format tool results as text
+                                text_parts.append(f"Tool result: {block.get('content', '')}")
+                    content = "\n".join(text_parts)
+                ollama_messages.append({"role": msg.role, "content": content})
 
             # Build request
             request_data = {
@@ -138,9 +151,22 @@ class OllamaProvider(LLMProvider):
         """
         try:
             # Convert messages to Ollama format
-            ollama_messages = [
-                {"role": msg.role, "content": msg.content} for msg in messages
-            ]
+            ollama_messages = []
+            for msg in messages:
+                content = msg.content
+                # Handle structured content (from Anthropic-style messages)
+                if isinstance(content, list):
+                    # Convert structured blocks to text
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            if block.get("type") == "text":
+                                text_parts.append(block.get("text", ""))
+                            elif block.get("type") == "tool_result":
+                                # Format tool results as text
+                                text_parts.append(f"Tool result: {block.get('content', '')}")
+                    content = "\n".join(text_parts)
+                ollama_messages.append({"role": msg.role, "content": content})
 
             # Build request
             request_data = {

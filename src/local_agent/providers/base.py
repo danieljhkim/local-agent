@@ -10,7 +10,7 @@ class Message(BaseModel):
     """Chat message."""
 
     role: str  # "user", "assistant", "system"
-    content: str
+    content: str | List[Dict[str, Any]]  # String or structured content blocks
 
 
 class ToolCall(BaseModel):

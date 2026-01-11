@@ -47,7 +47,12 @@ class AnthropicProvider(LLMProvider):
             if msg.role == "system":
                 system_message = msg.content
             else:
-                anthropic_messages.append({"role": msg.role, "content": msg.content})
+                # Handle both string and structured content
+                content = msg.content
+                if isinstance(content, str):
+                    content = content  # Keep as string
+                # If content is a list (structured blocks), pass as-is
+                anthropic_messages.append({"role": msg.role, "content": content})
 
         # Make API call
         request_kwargs = {
@@ -108,7 +113,12 @@ class AnthropicProvider(LLMProvider):
             if msg.role == "system":
                 system_message = msg.content
             else:
-                anthropic_messages.append({"role": msg.role, "content": msg.content})
+                # Handle both string and structured content
+                content = msg.content
+                if isinstance(content, str):
+                    content = content  # Keep as string
+                # If content is a list (structured blocks), pass as-is
+                anthropic_messages.append({"role": msg.role, "content": content})
 
         # Make streaming API call
         request_kwargs = {

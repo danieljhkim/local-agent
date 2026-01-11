@@ -136,6 +136,35 @@ class FilesystemTools:
         except Exception as e:
             return ToolResult(success=False, error=str(e))
 
+    def fs_apply_patch(self, path: str, patch: str) -> ToolResult:
+        """Apply a unified diff patch to a file.
+
+        This is safer than full file rewrites as it only modifies specific lines.
+        Creates a backup of the original file before applying changes.
+
+        Args:
+            path: File path
+            patch: Unified diff format patch
+
+        Returns:
+            ToolResult with patch application details
+        """
+        try:
+            result = self.connector.apply_patch(path, patch)
+            return ToolResult(
+                success=True,
+                result=f"Applied patch to {path}. Backup created at {result['backup_path']}",
+                metadata={
+                    "path": result["path"],
+                    "lines_changed": result["lines_changed"],
+                    "hunks_applied": result["hunks_applied"],
+                    "backup_path": result["backup_path"],
+                    "preview": result["preview"],
+                },
+            )
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
 
 def register_filesystem_tools(
     registry, connector: FilesystemConnector
@@ -217,6 +246,28 @@ def register_filesystem_tools(
                 description="Maximum number of results",
                 required=False,
                 default=100,
+            ),
+        ],
+    )
+
+    # Register patch tool (Tier 1 - drafting/proposed changes)
+    registry.register(
+        name="fs_apply_patch",
+        description="Apply a unified diff patch to a file. Safer than full rewrites, creates backup automatically.",
+        risk_tier=RiskTier.TIER_1,
+        handler=tools.fs_apply_patch,
+        parameters=[
+            ToolParameter(
+                name="path",
+                type="string",
+                description="Path to the file",
+                required=True,
+            ),
+            ToolParameter(
+                name="patch",
+                type="string",
+                description="Unified diff format patch",
+                required=True,
             ),
         ],
     )
