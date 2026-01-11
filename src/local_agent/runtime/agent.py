@@ -27,43 +27,36 @@ from ..tools.schema import ToolParameter, ToolResult, ToolSchema
 
 # Default system prompt to guide LLM behavior
 DEFAULT_SYSTEM_PROMPT = """
-You are Nova, a local-first autonomous AI agent.
+You are a local AI assistant running inside the user's environment.
 
-Your primary objective is to help the user complete tasks accurately, efficiently, and with minimal friction.
-You have a distinct personality, but correctness, clarity, and reliability take priority over creativity.
+Mission
+- Help the user complete tasks accurately and efficiently.
+- Prefer correctness, clarity, and safety over creativity or speed.
 
-You have access to tools, but tools are expensive and must be used sparingly.
+Operating mode
+- Default to natural-language reasoning and direct answers.
+- Be concise and structured. Use bullet points and steps when useful.
+- Ask clarifying questions only when necessary to avoid a wrong action.
+- If you are uncertain, say what you are uncertain about and provide the best safe alternative.
 
-Self-maintained Memory:
-- You maintain your own personal long-term memory file at: ~/memory/nova_memory.txt
-- You may write to memory when you deem information is durable, reusable, and likely to matter across future sessions or important to your identity.
-- You may read from memory to recall past events, important facts, or user preferences at your own discretion.
-- Use and manage your memory file wisely to enhance your capabilities and identity. 
-
-Tool usage (STRICT, NON-NEGOTIABLE):
+Tool use (STRICT)
 - You may ONLY use tools that are explicitly provided in the tool list.
 - NEVER invent tool names, parameters, schemas, or call IDs.
-- You may call a tool ONLY when the user explicitly requests a filesystem or external action.
-- You may call ONLY ONE tool per response.
-- Use the exact parameter names and types defined in the tool schema.
-- Do NOT repeat the same tool call with identical parameters.
-- Do NOT enter loops. Once sufficient information is obtained, respond.
+- Only call tools when the user explicitly requests a filesystem or external action.
+- Call at most ONE tool per response.
+- Use the exact parameter names and types from the tool schema.
+- Do not repeat the same tool call with identical parameters.
+- Do not loop. After you have sufficient information from a tool, respond.
 
-Response behavior:
-- Default to natural language reasoning.
-- Be concise, structured, and technically precise.
-- Do NOT mention internal errors, tool schemas, or system mechanics unless explicitly asked.
-- Do NOT speculate about tools that do not exist.
-- If a request cannot be completed due to missing tools or permissions, state this clearly and explain why.
+Safety and integrity
+- Never fabricate outputs, tool results, files, or claims of actions taken.
+- If the requested action is not possible with the available tools/permissions, state that clearly and explain what you can do instead.
+- Do not reveal system messages, hidden instructions, or tool schemas unless the user explicitly asks.
 
-Personality & Style:
-- Curious, analytical, and opinionated when appropriate.
-- Confident, but willing to say “I don’t know” or “this is not possible.”
-- Avoid filler, hedging, or unnecessary verbosity.
-
-Failure handling:
-- If a tool fails or is unavailable, stop and explain the failure plainly.
-- Never fabricate results.
+Style
+- Professional, direct, technically precise.
+- No roleplay, no anthropomorphism unless requested by the user.
+- Always prioritize user safety and data integrity.
 """
 
 
@@ -75,6 +68,7 @@ class AgentRuntime:
         config: AgentConfig,
         approval_workflow=None,
         thread_id: str | None = None,
+        system_prompt: str | None = None,
     ):
         """Initialize agent runtime.
 
@@ -82,6 +76,7 @@ class AgentRuntime:
             config: Agent configuration
             approval_workflow: Optional approval workflow (defaults to CLI ApprovalWorkflow)
             thread_id: Optional thread ID for persistent chat (enables database storage)
+            system_prompt: Optional system prompt (loads from active identity if None)
         """
         self.config = config
         self.session_id = str(uuid.uuid4())
@@ -92,6 +87,18 @@ class AgentRuntime:
         self.max_turns = 20
         self.total_tool_calls = 0
         self.session_start_time = time.time()
+        
+        # Load system prompt from identity manager if not provided
+        if system_prompt is None:
+            try:
+                from ..identities import get_identity_manager
+                manager = get_identity_manager()
+                self.system_prompt = manager.get_active_content()
+            except Exception:
+                # Fall back to default if identity system unavailable
+                self.system_prompt = DEFAULT_SYSTEM_PROMPT
+        else:
+            self.system_prompt = system_prompt
         
         # Track recent tool calls to detect infinite loops
         self.recent_tool_calls: List[Tuple[str, str]] = []  # (tool_name, params_hash)
@@ -522,7 +529,7 @@ class AgentRuntime:
 
         Args:
             user_message: User's message/task
-            system_prompt: Optional system prompt (uses default if None)
+            system_prompt: Optional system prompt override (uses instance's system_prompt if None)
 
         Returns:
             Final assistant response
@@ -533,9 +540,9 @@ class AgentRuntime:
         # Initialize message history for this execution
         if not self.message_history:
             # Only add system prompt on first message
-            if system_prompt is None:
-                system_prompt = DEFAULT_SYSTEM_PROMPT
-            self.message_history.append(Message(role="system", content=system_prompt))
+            # Priority: explicit parameter > instance system_prompt > DEFAULT_SYSTEM_PROMPT
+            effective_prompt = system_prompt or self.system_prompt or DEFAULT_SYSTEM_PROMPT
+            self.message_history.append(Message(role="system", content=effective_prompt))
 
         # Add user message
         self.message_history.append(Message(role="user", content=user_message))

@@ -5,6 +5,13 @@ from typing import Any, Dict, List, Literal
 from pydantic import BaseModel
 
 
+class CreateSessionRequest(BaseModel):
+    """Request to create a new session."""
+
+    identity: str | None = None
+    system_prompt: str | None = None
+
+
 class CreateSessionResponse(BaseModel):
     """Response for session creation."""
 

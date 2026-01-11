@@ -65,8 +65,11 @@ class SessionManager:
         self.cleanup_interval_seconds = 300  # 5 minutes
         self.session_timeout_seconds = 3600  # 1 hour
 
-    async def create_session(self) -> SessionInfo:
+    async def create_session(self, system_prompt: str | None = None) -> SessionInfo:
         """Create a new agent session.
+
+        Args:
+            system_prompt: Optional system prompt/identity for this session
 
         Returns:
             SessionInfo for the new session
@@ -79,8 +82,12 @@ class SessionManager:
         # Create web approval workflow
         approval_workflow = WebApprovalWorkflow(approval_queue)
 
-        # Create AgentRuntime with custom approval workflow
-        runtime = AgentRuntime(self.config, approval_workflow=approval_workflow)
+        # Create AgentRuntime with custom approval workflow and optional system prompt
+        runtime = AgentRuntime(
+            self.config,
+            approval_workflow=approval_workflow,
+            system_prompt=system_prompt,
+        )
 
         session_info = SessionInfo(
             session_id=session_id,
