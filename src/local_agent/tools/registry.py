@@ -48,7 +48,3 @@ class ToolRegistry:
     def list_by_tier(self, tier: RiskTier) -> list[ToolSchema]:
         """List tools by risk tier."""
         return [tool for tool in self._tools.values() if tool.risk_tier == tier]
-
-
-# Global registry instance
-registry = ToolRegistry()

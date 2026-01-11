@@ -12,8 +12,6 @@ from typing import Any, Dict, List, Tuple
 
 from rich.console import Console
 
-from local_agent.providers.ollama import OllamaProvider
-
 from ..audit.logger import AuditLogger
 from ..config.schema import AgentConfig
 from ..connectors.filesystem import FilesystemConnector
@@ -21,7 +19,8 @@ from ..policy.approval import ApprovalWorkflow
 from ..policy.engine import PolicyEngine
 from ..providers.anthropic import AnthropicProvider
 from ..providers.base import CompletionResponse, LLMProvider, Message, ToolCall
-from ..providers.openai import OpenAIProvider
+from ..providers.factory import create_provider
+from ..providers.ollama import OllamaProvider
 from ..tools.filesystem import register_filesystem_tools
 from ..tools.registry import ToolRegistry
 from ..tools.schema import ToolParameter, ToolResult, ToolSchema
@@ -173,36 +172,8 @@ class AgentRuntime:
         if not provider_config:
             raise ValueError(f"Provider '{provider_name}' not found in config")
 
-        # Get API key from config or environment
-        api_key = provider_config.api_key
-        if not api_key:
-            # Try environment variable
-            if provider_name == "anthropic":
-                api_key = os.environ.get("ANTHROPIC_API_KEY")
-            elif provider_name == "openai":
-                api_key = os.environ.get("OPENAI_API_KEY")
-            elif provider_name == "ollama":
-                api_key = "default"  # Ollama does not require an API key
-
-        if not api_key:
-            raise ValueError(
-                f"API key not found for provider '{provider_name}'. "
-                f"Set in config or environment variable."
-            )
-
-        # Instantiate provider
-        if provider_name == "anthropic":
-            return AnthropicProvider(api_key=api_key, model=provider_config.model)
-        elif provider_name == "openai":
-            return OpenAIProvider(api_key=api_key, model=provider_config.model)
-        elif provider_name == "ollama":
-            return OllamaProvider(
-                api_key=api_key,
-                model=provider_config.model,
-                base_url=provider_config.base_url,
-            )
-        else:
-            raise ValueError(f"Unknown provider: {provider_name}")
+        # Use factory to create provider
+        return create_provider(provider_config)
 
     def _init_registry(self) -> ToolRegistry:
         """Initialize tool registry and register tools.
@@ -220,9 +191,9 @@ class AgentRuntime:
 
         # RAG tools (conditional - only if Qdrant is available)
         try:
-            from .services.embedding import EmbeddingService
-            from .connectors.qdrant import QdrantConnector
-            from .tools.rag import register_rag_tools
+            from ..services.embedding import EmbeddingService
+            from ..connectors.qdrant import QdrantConnector
+            from ..tools.rag import register_rag_tools
 
             embedding_service = EmbeddingService(self.config.embedding)
             qdrant_connector = QdrantConnector(self.config.qdrant)

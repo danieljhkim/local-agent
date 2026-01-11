@@ -127,6 +127,26 @@ class RAGConfig(BaseModel):
     )
 
 
+class DatabaseConfig(BaseModel):
+    """Database configuration."""
+
+    path: str = Field(
+        default="~/.local/agent/state/local_agent.db",
+        description="SQLite database file path",
+    )
+
+
+class WebConfig(BaseModel):
+    """Web server configuration."""
+
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173"],
+        description="Allowed CORS origins",
+    )
+    host: str = Field(default="0.0.0.0", description="Host to bind to")
+    port: int = Field(default=8000, description="Port to listen on")
+
+
 class AgentConfig(BaseSettings):
     """Main agent configuration."""
 
@@ -147,6 +167,8 @@ class AgentConfig(BaseSettings):
     qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     rag: RAGConfig = Field(default_factory=RAGConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    web: WebConfig = Field(default_factory=WebConfig)
 
     class Config:
         env_prefix = "AGENT_"

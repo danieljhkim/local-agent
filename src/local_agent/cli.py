@@ -1,5 +1,6 @@
 """CLI entry point for the local agent."""
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -11,6 +12,47 @@ from rich.table import Table
 from . import __version__
 from .config.loader import load_config, save_config
 from .config.schema import AgentConfig
+
+
+def _run_interactive_repl(runtime, console: Console) -> None:
+    """Run an interactive REPL loop with the agent.
+    
+    Handles user input, exit commands, and keyboard interrupts.
+    Uses a persistent event loop for the session.
+    
+    Args:
+        runtime: AgentRuntime instance to execute commands
+        console: Rich console for output
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        while True:
+            try:
+                user_input = console.input("[bold blue]You:[/bold blue] ")
+
+                if user_input.strip().lower() in ["exit", "quit"]:
+                    console.print("\n[yellow]Goodbye![/yellow]")
+                    break
+
+                if not user_input.strip():
+                    continue
+
+                loop.run_until_complete(runtime.execute(user_input))
+
+            except EOFError:
+                console.print("\n[yellow]Goodbye![/yellow]")
+                break
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
+                continue
+            except Exception as e:
+                console.print(f"[red]Error:[/red] {e}")
+                console.print("[dim]You can continue or type 'exit' to quit[/dim]")
+    finally:
+        runtime.shutdown()
+
 
 app = typer.Typer(
     name="agent",
@@ -48,7 +90,7 @@ def chat(
         # Create new thread
         from .persistence.db import SessionLocal
         from .persistence.db_models import Thread
-        from .persistence.init import check_database_exists, init_database
+        from .persistence.database_init import check_database_exists, init_database
 
         if not check_database_exists():
             console.print("[yellow]Database not found. Initializing...[/yellow]")
@@ -90,46 +132,8 @@ def chat(
         console.print(f"[red]Error initializing agent:[/red] {e}")
         raise typer.Exit(1)
 
-    # Create persistent event loop for the session
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    # REPL loop
-    try:
-        while True:
-            try:
-                # Get user input
-                user_input = console.input("[bold blue]You:[/bold blue] ")
-
-                # Check for exit commands
-                if user_input.strip().lower() in ["exit", "quit"]:
-                    console.print("\n[yellow]Goodbye![/yellow]")
-                    break
-
-                if not user_input.strip():
-                    continue
-
-                # Execute task using persistent event loop
-                response = loop.run_until_complete(runtime.execute(user_input))
-
-                # Note: Response is already printed by runtime.execute()
-                # Only print if we got a response but nothing was displayed
-                # (this shouldn't happen in normal operation)
-
-            except EOFError:
-                # Ctrl+D pressed
-                console.print("\n[yellow]Goodbye![/yellow]")
-                break
-            except KeyboardInterrupt:
-                # Ctrl+C pressed
-                console.print("\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
-                continue
-            except Exception as e:
-                console.print(f"[red]Error:[/red] {e}")
-                console.print("[dim]You can continue or type 'exit' to quit[/dim]")
-    finally:
-        # Always shutdown runtime to close database session
-        runtime.shutdown()
+    # Run interactive REPL
+    _run_interactive_repl(runtime, console)
 
 
 @app.command()
@@ -317,7 +321,7 @@ def ingest(
         config = load_config(config_file)
 
         # Ensure database is initialized
-        from .persistence.init import check_database_exists, init_database
+        from .persistence.database_init import check_database_exists, init_database
         if not check_database_exists():
             console.print("[yellow]Database not found. Initializing...[/yellow]")
             init_database()
@@ -410,7 +414,7 @@ def threads_list(
     """List recent conversation threads."""
     from .persistence.db import SessionLocal
     from .persistence.db_models import Thread
-    from .persistence.init import check_database_exists, init_database
+    from .persistence.database_init import check_database_exists, init_database
     from sqlalchemy import select
 
     # Initialize database if it doesn't exist
@@ -466,7 +470,7 @@ def threads_new(
 
     from .persistence.db import SessionLocal
     from .persistence.db_models import Thread
-    from .persistence.init import check_database_exists, init_database
+    from .persistence.database_init import check_database_exists, init_database
     from .runtime import AgentRuntime
 
     # Initialize database if it doesn't exist
@@ -507,35 +511,8 @@ def threads_new(
         console.print(f"[red]Error initializing agent:[/red] {e}")
         raise typer.Exit(1)
 
-    # Create persistent event loop for the session
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    # REPL loop
-    while True:
-        try:
-            user_input = console.input("[bold blue]You:[/bold blue] ")
-
-            if user_input.strip().lower() in ["exit", "quit"]:
-                console.print("\n[yellow]Goodbye![/yellow]")
-                runtime.shutdown()
-                break
-
-            if not user_input.strip():
-                continue
-
-            response = loop.run_until_complete(runtime.execute(user_input))
-
-        except EOFError:
-            console.print("\n[yellow]Goodbye![/yellow]")
-            runtime.shutdown()
-            break
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
-            continue
-        except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print("[dim]You can continue or type 'exit' to quit[/dim]")
+    # Run interactive REPL
+    _run_interactive_repl(runtime, console)
 
 
 @threads_app.command("resume")
@@ -550,7 +527,7 @@ def threads_resume(
 
     from .persistence.db import SessionLocal
     from .persistence.db_models import Thread
-    from .persistence.init import check_database_exists, init_database
+    from .persistence.database_init import check_database_exists, init_database
     from .runtime import AgentRuntime
 
     # Initialize database if it doesn't exist
@@ -624,35 +601,8 @@ def threads_resume(
                 console.print(f"  [bold green]Assistant:[/bold green] {content}...")
         console.print()
 
-    # Create persistent event loop for the session
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    # REPL loop
-    while True:
-        try:
-            user_input = console.input("[bold blue]You:[/bold blue] ")
-
-            if user_input.strip().lower() in ["exit", "quit"]:
-                console.print("\n[yellow]Goodbye![/yellow]")
-                runtime.shutdown()
-                break
-
-            if not user_input.strip():
-                continue
-
-            response = loop.run_until_complete(runtime.execute(user_input))
-
-        except EOFError:
-            console.print("\n[yellow]Goodbye![/yellow]")
-            runtime.shutdown()
-            break
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
-            continue
-        except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print("[dim]You can continue or type 'exit' to quit[/dim]")
+    # Run interactive REPL
+    _run_interactive_repl(runtime, console)
 
 
 @threads_app.command("delete")
@@ -663,7 +613,7 @@ def threads_delete(
     """Delete a conversation thread and all its messages."""
     from .persistence.db import SessionLocal
     from .persistence.db_models import Thread
-    from .persistence.init import check_database_exists
+    from .persistence.database_init import check_database_exists
     from sqlalchemy import select
 
     # Check database exists
@@ -974,7 +924,7 @@ def db_init() -> None:
     Creates all required tables (threads, messages, sessions, message_meta).
     Safe to run multiple times - will not drop existing tables.
     """
-    from .persistence.init import init_database, check_database_exists, get_database_info
+    from .persistence.database_init import init_database, check_database_exists, get_database_info
 
     console.print("[bold cyan]Initializing Database[/bold cyan]\n")
 
@@ -1010,7 +960,7 @@ def db_reset(force: bool = typer.Option(False, "--force", "-f", help="Skip confi
     Drops all tables and recreates them. All threads, messages, and sessions will be lost.
     Use with caution - this operation cannot be undone.
     """
-    from .persistence.init import reset_database, get_database_info
+    from .persistence.database_init import reset_database, get_database_info
 
     console.print("[bold red]WARNING: Database Reset[/bold red]\n")
 
@@ -1052,7 +1002,7 @@ def db_info() -> None:
     """Show database statistics and information."""
     from .persistence.db import SessionLocal
     from .persistence.db_models import Thread, Message, Session, MessageMeta
-    from .persistence.init import check_database_exists, get_database_info
+    from .persistence.database_init import check_database_exists, get_database_info
     from sqlalchemy import func
 
     if not check_database_exists():

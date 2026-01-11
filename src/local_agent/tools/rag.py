@@ -2,7 +2,8 @@
 
 from typing import List
 
-from .schema import ToolParameter, ToolRegistry, ToolResult, RiskTier
+from .schema import ToolParameter, ToolResult, RiskTier
+from .registry import ToolRegistry
 from ..config.schema import RAGConfig
 from ..connectors.qdrant import QdrantConnector
 from ..services.embedding import EmbeddingService

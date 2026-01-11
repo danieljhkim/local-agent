@@ -6,7 +6,14 @@ from typing import Any, AsyncIterator, Dict, List
 
 import httpx
 
-from .base import CompletionResponse, LLMProvider, Message, ToolCall
+from .base import (
+    CompletionResponse,
+    LLMProvider,
+    Message,
+    ProviderConnectionError,
+    ProviderTimeoutError,
+    ToolCall,
+)
 
 
 class OllamaProvider(LLMProvider):
@@ -117,21 +124,18 @@ class OllamaProvider(LLMProvider):
                 finish_reason=data.get("done_reason", "stop"),
             )
 
-        except httpx.ConnectError:
-            return CompletionResponse(
-                content="Error: Cannot connect to Ollama. Is it running at {self.base_url}?",
-                finish_reason="error",
-            )
-        except httpx.TimeoutException:
-            return CompletionResponse(
-                content=f"Error: Ollama request timed out after {self.timeout}s",
-                finish_reason="error",
-            )
+        except httpx.ConnectError as e:
+            raise ProviderConnectionError(
+                f"Cannot connect to Ollama at {self.base_url}. Is it running?"
+            ) from e
+        except httpx.TimeoutException as e:
+            raise ProviderTimeoutError(
+                f"Ollama request timed out after {self.timeout}s"
+            ) from e
         except Exception as e:
-            return CompletionResponse(
-                content=f"Error calling Ollama: {str(e)}",
-                finish_reason="error",
-            )
+            raise ProviderConnectionError(
+                f"Error calling Ollama: {str(e)}"
+            ) from e
 
     async def stream_complete(
         self,
@@ -224,21 +228,18 @@ class OllamaProvider(LLMProvider):
                         # Skip invalid JSON lines
                         continue
 
-        except httpx.ConnectError:
-            yield CompletionResponse(
-                content=f"Error: Cannot connect to Ollama. Is it running at {self.base_url}?",
-                finish_reason="error",
-            )
-        except httpx.TimeoutException:
-            yield CompletionResponse(
-                content=f"Error: Ollama request timed out after {self.timeout}s",
-                finish_reason="error",
-            )
+        except httpx.ConnectError as e:
+            raise ProviderConnectionError(
+                f"Cannot connect to Ollama at {self.base_url}. Is it running?"
+            ) from e
+        except httpx.TimeoutException as e:
+            raise ProviderTimeoutError(
+                f"Ollama request timed out after {self.timeout}s"
+            ) from e
         except Exception as e:
-            yield CompletionResponse(
-                content=f"Error calling Ollama: {str(e)}",
-                finish_reason="error",
-            )
+            raise ProviderConnectionError(
+                f"Error calling Ollama: {str(e)}"
+            ) from e
 
     async def __aenter__(self):
         """Async context manager entry."""
