@@ -13,7 +13,7 @@ def get_database_path() -> Path:
     Priority:
     1. AGENT_DATABASE_PATH env var (explicit path)
     2. AGENT_STATE_DIR env var + local_agent.db
-    3. Default: ~/.local/agent/state/local_agent.db
+    3. Default: ~/.local/share/local-agent/state/local_agent.db
     """
     # Check for explicit database path
     if db_path := os.environ.get("AGENT_DATABASE_PATH"):
@@ -21,7 +21,7 @@ def get_database_path() -> Path:
 
     # Check for state directory
     state_dir = os.environ.get(
-        "AGENT_STATE_DIR", str(Path.home() / ".local" / "agent" / "state")
+        "AGENT_STATE_DIR", str(Path.home() / ".local" / "share" / "local-agent" / "state")
     )
     return Path(state_dir) / "local_agent.db"
 
