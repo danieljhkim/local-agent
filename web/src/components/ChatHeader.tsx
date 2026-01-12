@@ -2,13 +2,21 @@
  * Chat header with session info and status indicator
  */
 
+import { IdentitySelector } from './IdentitySelector'
+
 interface ChatHeaderProps {
   sessionId: string | null
   status: 'idle' | 'executing' | 'completed' | 'error'
   approvalCount: number
+  onIdentityChange?: (identity: string) => void
 }
 
-export function ChatHeader({ sessionId, status, approvalCount }: ChatHeaderProps) {
+export function ChatHeader({
+  sessionId,
+  status,
+  approvalCount,
+  onIdentityChange,
+}: ChatHeaderProps) {
   const statusConfig = {
     idle: { color: 'bg-gray-400', label: 'Idle' },
     executing: { color: 'bg-blue-500 animate-pulse', label: 'Executing' },
@@ -29,6 +37,8 @@ export function ChatHeader({ sessionId, status, approvalCount }: ChatHeaderProps
       </div>
 
       <div className="flex items-center gap-4">
+        <IdentitySelector onIdentityChange={onIdentityChange} />
+
         {approvalCount > 0 && (
           <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">
             {approvalCount} pending

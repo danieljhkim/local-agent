@@ -15,7 +15,7 @@ from sqlalchemy import select, desc
 from ..config.loader import load_config
 from .dependencies import set_session_manager
 from .session_manager import SessionManager
-from .routes import sessions, chat, approvals
+from .routes import sessions, chat, approvals, threads, identities
 from ..persistence.db import engine, SessionLocal, Base
 from ..persistence.db_models import Thread, Message
 
@@ -48,6 +48,8 @@ set_session_manager(session_manager)
 app.include_router(sessions.router)
 app.include_router(chat.router)
 app.include_router(approvals.router)
+app.include_router(threads.router)
+app.include_router(identities.router)
 
 
 # Startup: Start cleanup task

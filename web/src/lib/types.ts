@@ -37,3 +37,32 @@ export interface MessageHistoryResponse {
 export interface PendingApprovalsResponse {
   approvals: ApprovalInfo[]
 }
+
+export interface ThreadInfo {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+  message_count?: number
+}
+
+export interface ListThreadsResponse {
+  threads: ThreadInfo[]
+}
+
+export interface IdentityInfo {
+  name: string
+  is_builtin: boolean
+  is_active: boolean
+}
+
+export interface ListIdentitiesResponse {
+  identities: IdentityInfo[]
+  active: string
+}
+
+export interface IdentityContentResponse {
+  name: string
+  content: string
+  is_builtin: boolean
+}

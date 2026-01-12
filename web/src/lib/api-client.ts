@@ -9,6 +9,11 @@ import type {
   MessageInfo,
   MessageHistoryResponse,
   PendingApprovalsResponse,
+  ThreadInfo,
+  ListThreadsResponse,
+  IdentityInfo,
+  ListIdentitiesResponse,
+  IdentityContentResponse,
 } from './types'
 
 export class AgentAPIClient {
@@ -21,13 +26,18 @@ export class AgentAPIClient {
   /**
    * Create a new agent session
    */
-  async createSession(identity?: string, systemPrompt?: string): Promise<string> {
+  async createSession(
+    identity?: string,
+    systemPrompt?: string,
+    threadId?: string
+  ): Promise<string> {
     const response = await fetch(`${this.baseURL}/api/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identity: identity || null,
         system_prompt: systemPrompt || null,
+        thread_id: threadId || null,
       }),
     })
 
@@ -163,6 +173,138 @@ export class AgentAPIClient {
 
     if (!response.ok) {
       throw new Error(`Failed to deny request: ${response.statusText}`)
+    }
+  }
+
+  // ========================================
+  // Thread Management
+  // ========================================
+
+  /**
+   * Create a new thread
+   */
+  async createThread(title?: string): Promise<string> {
+    const response = await fetch(`${this.baseURL}/api/threads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title || null,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to create thread: ${response.statusText}`)
+    }
+
+    const data: CreateSessionResponse = await response.json()
+    return data.session_id
+  }
+
+  /**
+   * List threads
+   */
+  async listThreads(limit: number = 50, offset: number = 0): Promise<ThreadInfo[]> {
+    const response = await fetch(
+      `${this.baseURL}/api/threads?limit=${limit}&offset=${offset}`
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to list threads: ${response.statusText}`)
+    }
+
+    const data: ListThreadsResponse = await response.json()
+    return data.threads
+  }
+
+  /**
+   * Get a single thread
+   */
+  async getThread(threadId: string): Promise<ThreadInfo> {
+    const response = await fetch(`${this.baseURL}/api/threads/${threadId}`)
+
+    if (!response.ok) {
+      throw new Error(`Failed to get thread: ${response.statusText}`)
+    }
+
+    return await response.json()
+  }
+
+  /**
+   * Update thread title
+   */
+  async updateThread(threadId: string, title: string): Promise<ThreadInfo> {
+    const response = await fetch(`${this.baseURL}/api/threads/${threadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to update thread: ${response.statusText}`)
+    }
+
+    return await response.json()
+  }
+
+  /**
+   * Delete a thread
+   */
+  async deleteThread(threadId: string): Promise<void> {
+    const response = await fetch(`${this.baseURL}/api/threads/${threadId}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete thread: ${response.statusText}`)
+    }
+  }
+
+  // ========================================
+  // Identity Management
+  // ========================================
+
+  /**
+   * List all identities
+   */
+  async listIdentities(): Promise<ListIdentitiesResponse> {
+    const response = await fetch(`${this.baseURL}/api/identities`)
+
+    if (!response.ok) {
+      throw new Error(`Failed to list identities: ${response.statusText}`)
+    }
+
+    return await response.json()
+  }
+
+  /**
+   * Get identity content
+   */
+  async getIdentity(name: string): Promise<IdentityContentResponse> {
+    const response = await fetch(`${this.baseURL}/api/identities/${name}`)
+
+    if (!response.ok) {
+      throw new Error(`Failed to get identity: ${response.statusText}`)
+    }
+
+    return await response.json()
+  }
+
+  /**
+   * Set active identity
+   */
+  async setActiveIdentity(name: string): Promise<void> {
+    const response = await fetch(`${this.baseURL}/api/identities/active`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to set active identity: ${response.statusText}`)
     }
   }
 }

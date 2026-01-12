@@ -2,32 +2,46 @@
  * Global agent state management with React Context
  */
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { apiClient } from '../lib/api-client'
-import type { ApprovalInfo, MessageInfo } from '../lib/types'
+import type { ApprovalInfo, MessageInfo, ThreadInfo } from '../lib/types'
 import { useExecutionPolling } from '../hooks/useExecutionPolling'
 import { useApprovalPolling } from '../hooks/useApprovalPolling'
 import { useMessageHistory } from '../hooks/useMessageHistory'
+import { useThreads } from '../hooks/useThreads'
 
 interface AgentContextType {
-  // State
+  // Session state
   sessionId: string | null
   executionStatus: 'idle' | 'executing' | 'completed' | 'error'
   messages: MessageInfo[]
   pendingApprovals: ApprovalInfo[]
   error: string | null
 
-  // Actions
+  // Thread state
+  threads: ThreadInfo[]
+  currentThreadId: string | null
+  threadsLoading: boolean
+
+  // Session actions
   sendMessage: (message: string) => Promise<void>
   approveRequest: (approvalId: string, reason?: string) => Promise<void>
   denyRequest: (approvalId: string, reason: string) => Promise<void>
   clearError: () => void
+
+  // Thread actions
+  createNewThread: () => Promise<void>
+  selectThread: (threadId: string) => Promise<void>
+  updateThreadTitle: (threadId: string, title: string) => Promise<void>
+  deleteThread: (threadId: string) => Promise<void>
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined)
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
   const [executionStatus, setExecutionStatus] = useState<
     'idle' | 'executing' | 'completed' | 'error'
   >('idle')
@@ -37,8 +51,16 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const { messages, addMessage, refreshHistory } = useMessageHistory(sessionId)
   const polling = useExecutionPolling(sessionId, executionStatus === 'executing')
   const { approvals } = useApprovalPolling(sessionId, executionStatus === 'executing')
+  const {
+    threads,
+    loading: threadsLoading,
+    createThread,
+    updateThread,
+    deleteThread: deleteThreadApi,
+    loadThreads,
+  } = useThreads()
 
-  // Create session on mount
+  // Create ephemeral session on mount (no thread)
   useEffect(() => {
     let currentSessionId: string | null = null
 
@@ -130,6 +152,79 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const clearError = () => setError(null)
 
+  /**
+   * Create a new thread and start a session for it
+   */
+  const createNewThread = async () => {
+    try {
+      const threadId = await createThread('New chat')
+      if (threadId) {
+        await selectThread(threadId)
+      }
+    } catch (err) {
+      console.error('Failed to create new thread:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create thread')
+    }
+  }
+
+  /**
+   * Select a thread and create/switch to a session for it
+   */
+  const selectThread = async (threadId: string) => {
+    try {
+      // Clean up old session if exists
+      if (sessionId) {
+        await apiClient.deleteSession(sessionId).catch(console.error)
+      }
+
+      // Create new session linked to thread
+      const newSessionId = await apiClient.createSession(undefined, undefined, threadId)
+      setSessionId(newSessionId)
+      setCurrentThreadId(threadId)
+      setExecutionStatus('idle')
+      setError(null)
+
+      // Refresh history for the new thread
+      setTimeout(() => refreshHistory(), 100)
+    } catch (err) {
+      console.error('Failed to select thread:', err)
+      setError(err instanceof Error ? err.message : 'Failed to select thread')
+    }
+  }
+
+  /**
+   * Update thread title
+   */
+  const updateThreadTitle = async (threadId: string, title: string) => {
+    try {
+      await updateThread(threadId, title)
+    } catch (err) {
+      console.error('Failed to update thread:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update thread')
+    }
+  }
+
+  /**
+   * Delete a thread
+   */
+  const handleDeleteThread = async (threadId: string) => {
+    try {
+      // If deleting current thread, switch to ephemeral session
+      if (threadId === currentThreadId) {
+        const newSessionId = await apiClient.createSession()
+        setSessionId(newSessionId)
+        setCurrentThreadId(null)
+        setExecutionStatus('idle')
+      }
+
+      await deleteThreadApi(threadId)
+      await loadThreads()
+    } catch (err) {
+      console.error('Failed to delete thread:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete thread')
+    }
+  }
+
   return (
     <AgentContext.Provider
       value={{
@@ -138,10 +233,17 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         messages,
         pendingApprovals: approvals,
         error,
+        threads,
+        currentThreadId,
+        threadsLoading,
         sendMessage,
         approveRequest,
         denyRequest,
         clearError,
+        createNewThread,
+        selectThread,
+        updateThreadTitle,
+        deleteThread: handleDeleteThread,
       }}
     >
       {children}

@@ -10,6 +10,7 @@ class CreateSessionRequest(BaseModel):
 
     identity: str | None = None
     system_prompt: str | None = None
+    thread_id: str | None = None
 
 
 class CreateSessionResponse(BaseModel):
@@ -79,3 +80,31 @@ class MessageHistoryResponse(BaseModel):
     """Response with conversation history."""
 
     messages: List[MessageInfo]
+
+
+class ThreadInfo(BaseModel):
+    """Information about a conversation thread."""
+
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int | None = None
+
+
+class ListThreadsResponse(BaseModel):
+    """Response with list of threads."""
+
+    threads: List[ThreadInfo]
+
+
+class UpdateThreadRequest(BaseModel):
+    """Request to update thread metadata."""
+
+    title: str | None = None
+
+
+class CreateThreadRequest(BaseModel):
+    """Request to create a new thread."""
+
+    title: str | None = None

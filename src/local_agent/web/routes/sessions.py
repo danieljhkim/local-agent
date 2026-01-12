@@ -39,7 +39,10 @@ async def create_session(
         elif request.system_prompt:
             system_prompt = request.system_prompt
 
-    session = await session_manager.create_session(system_prompt=system_prompt)
+    thread_id = request.thread_id if request else None
+    session = await session_manager.create_session(
+        system_prompt=system_prompt, thread_id=thread_id
+    )
     return CreateSessionResponse(session_id=session.session_id)
 
 

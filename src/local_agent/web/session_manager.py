@@ -65,11 +65,16 @@ class SessionManager:
         self.cleanup_interval_seconds = 300  # 5 minutes
         self.session_timeout_seconds = 3600  # 1 hour
 
-    async def create_session(self, system_prompt: str | None = None) -> SessionInfo:
+    async def create_session(
+        self,
+        system_prompt: str | None = None,
+        thread_id: str | None = None,
+    ) -> SessionInfo:
         """Create a new agent session.
 
         Args:
             system_prompt: Optional system prompt/identity for this session
+            thread_id: Optional thread ID to link this session to a conversation thread
 
         Returns:
             SessionInfo for the new session
@@ -87,6 +92,7 @@ class SessionManager:
             self.config,
             approval_workflow=approval_workflow,
             system_prompt=system_prompt,
+            thread_id=thread_id,
         )
 
         session_info = SessionInfo(
