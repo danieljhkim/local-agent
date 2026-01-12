@@ -21,7 +21,8 @@ def get_database_path() -> Path:
 
     # Check for state directory
     state_dir = os.environ.get(
-        "AGENT_STATE_DIR", str(Path.home() / ".local" / "share" / "local-agent" / "state")
+        "AGENT_STATE_DIR",
+        str(Path.home() / ".local" / "share" / "local-agent" / "state"),
     )
     return Path(state_dir) / "local_agent.db"
 

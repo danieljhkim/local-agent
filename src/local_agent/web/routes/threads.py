@@ -103,7 +103,11 @@ def get_thread(thread_id: str):
             raise HTTPException(status_code=404, detail="Thread not found")
 
         # Count messages
-        message_count = db.query(func.count(Message.id)).filter(Message.thread_id == thread_id).scalar()
+        message_count = (
+            db.query(func.count(Message.id))
+            .filter(Message.thread_id == thread_id)
+            .scalar()
+        )
 
         return ThreadInfo(
             id=thread.id,
@@ -142,7 +146,11 @@ def update_thread(thread_id: str, request: UpdateThreadRequest):
         db.refresh(thread)
 
         # Count messages
-        message_count = db.query(func.count(Message.id)).filter(Message.thread_id == thread_id).scalar()
+        message_count = (
+            db.query(func.count(Message.id))
+            .filter(Message.thread_id == thread_id)
+            .scalar()
+        )
 
         return ThreadInfo(
             id=thread.id,

@@ -77,9 +77,6 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	rm -rf build/ dist/ htmlcov/ .coverage
 
-clean-all: clean
-	rm -rf storage/
-	@echo "⚠️  Storage and database removed"
 
 # Quick aliases
 all: dev

@@ -343,38 +343,42 @@ def ingest(
 
         # Display results
         console.print("\n[bold green]✓ Ingestion Complete[/bold green]\n")
-        
+
         # Handle both single file and directory results
         if Path(path).is_file():
             # Single file result
-            status = result.get('status', 'unknown')
-            if status == 'success':
-                console.print(f"[cyan]Chunks created:[/cyan] {result['chunks_created']}")
+            status = result.get("status", "unknown")
+            if status == "success":
+                console.print(
+                    f"[cyan]Chunks created:[/cyan] {result['chunks_created']}"
+                )
                 console.print(f"[cyan]Total tokens:[/cyan] {result['total_tokens']}")
-            elif status == 'skipped':
-                console.print(f"[yellow]Skipped:[/yellow] {result.get('reason')} - {result.get('message')}")
-            elif status == 'error':
+            elif status == "skipped":
+                console.print(
+                    f"[yellow]Skipped:[/yellow] {result.get('reason')} - {result.get('message')}"
+                )
+            elif status == "error":
                 console.print(f"[red]Error:[/red] {result.get('error')}")
         else:
             # Directory result
             console.print(f"[cyan]Files processed:[/cyan] {result['files_processed']}")
             console.print(f"[cyan]Files ingested:[/cyan] {result['files_ingested']}")
-            if result.get('files_skipped'):
-                console.print(f"[yellow]Files skipped:[/yellow] {result['files_skipped']}")
-            if result.get('files_errored'):
+            if result.get("files_skipped"):
+                console.print(
+                    f"[yellow]Files skipped:[/yellow] {result['files_skipped']}"
+                )
+            if result.get("files_errored"):
                 console.print(f"[red]Files errored:[/red] {result['files_errored']}")
             console.print(f"[cyan]Chunks created:[/cyan] {result['chunks_created']}")
             console.print(f"[cyan]Total tokens:[/cyan] {result['total_tokens']}")
-            
+
             # Show error sample if present
-            if result.get('error_sample'):
+            if result.get("error_sample"):
                 console.print(f"\n[yellow]Sample error:[/yellow]")
                 console.print(f"  [dim]File:[/dim] {result['error_sample']['file']}")
                 console.print(f"  [dim]Error:[/dim] {result['error_sample']['error']}")
-        
-        console.print(
-            f"[cyan]Elapsed time:[/cyan] {result['elapsed_seconds']:.2f}s"
-        )
+
+        console.print(f"[cyan]Elapsed time:[/cyan] {result['elapsed_seconds']:.2f}s")
 
     except Exception as e:
         console.print(f"\n[red]Error during ingestion:[/red] {e}")
