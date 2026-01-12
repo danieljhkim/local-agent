@@ -1,35 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+/**
+ * Main application component integrating chat UI and approval workflow
+ */
 
-function App() {
-  const [count, setCount] = useState(0)
+import { AgentProvider, useAgentContext } from './context/AgentContext'
+import { ChatHeader } from './components/ChatHeader'
+import { MessageList } from './components/MessageList'
+import { MessageInput } from './components/MessageInput'
+import { ApprovalPanel } from './components/ApprovalPanel'
+
+function ChatContainer() {
+  const {
+    sessionId,
+    executionStatus,
+    messages,
+    pendingApprovals,
+    sendMessage,
+    approveRequest,
+    denyRequest,
+    error,
+  } = useAgentContext()
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="h-screen flex flex-col">
+      <ChatHeader
+        sessionId={sessionId}
+        status={executionStatus}
+        approvalCount={pendingApprovals.length}
+      />
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 m-4 rounded">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      <MessageList messages={messages} />
+
+      <MessageInput onSend={sendMessage} disabled={executionStatus === 'executing'} />
+
+      <ApprovalPanel
+        approvals={pendingApprovals}
+        onApprove={approveRequest}
+        onDeny={denyRequest}
+      />
+    </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <AgentProvider>
+      <ChatContainer />
+    </AgentProvider>
+  )
+}
