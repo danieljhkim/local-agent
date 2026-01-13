@@ -4,6 +4,8 @@ Local Agent is a **local-first AI agent playground**, vibe-coded over a weekend 
 
 The goal of this project is learning and experimentation: understanding agent runtimes, tool safety models, RAG pipelines, memory management, and lightweight local persistence.
 
+![CLI HELP](docs/assets/cli-help.png)
+
 > **NOTE**: Expect rough edges. This project exists to learn, prototype, and throw ideas away - not to serve as a production-ready framework.
 
 ---
@@ -89,6 +91,7 @@ This creates a config file at `~/.config/local-agent/config.yaml`.
 **Option A: Ollama (recommended - fully local)**
 
 Install and start Ollama:
+
 ```bash
 # Install Ollama from https://ollama.ai
 # Pull a model - llama3.1:70b if you can
@@ -120,13 +123,6 @@ providers:
 default_provider: anthropic
 ```
 
-Or set environment variables:
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-# or
-export OPENAI_API_KEY=sk-...
-```
-
 ### 3. Configure workspace roots
 
 Add directories the agent can access:
@@ -141,7 +137,9 @@ workspace:
 
 ### 4. (Optional) Set up RAG with Qdrant
 
-For document search and knowledge base features:
+![CLI RAG](docs/assets/cli-rag.png)
+
+If you keep notes in one place, highly recommend using RAG so that your agent can be easily bootstrapped. 
 
 ```bash
 # Start Qdrant using Docker
@@ -160,7 +158,11 @@ agent rag query "how does authentication work"
 agent rag clear --force
 ```
 
-### 5. Initialize the database
+### 5. Initialize the SQLite database (Threads)
+
+![CLI THREAD](docs/assets/cli-threads.png)
+
+This will enable you "threads", persisted conversations which you can resume later.
 
 ```bash
 # Initialize SQLite database for persistent conversations
@@ -196,6 +198,8 @@ agent db info
 ```
 
 ### 7. Agent Identities
+
+![CLI IDENTITY](docs/assets/cli-identities.png)
 
 **List available identities:**
 ```bash
@@ -285,6 +289,8 @@ local-agent/
 
 ## Tool Risk Tiers
 
+![CLI TOOLS](docs/assets/cli-tools.png)
+
 Tools are classified by risk level:
 
 - **Tier 0 (Read-only)**: `fs_read_file`, `fs_list_dir`, `fs_search`, `rag_search`
@@ -330,6 +336,8 @@ approval_policies:
 --- 
 
 ## Audit Logs
+
+![CLI AUDIT](docs/assets/cli-audit.png)
 
 Every tool call is logged to `~/.local/share/local-agent/logs/` as JSONL:
 
